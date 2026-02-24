@@ -1,0 +1,16 @@
+
+🦞 OpenClaw 2026.2.23 (b817600) — Less middlemen, more messages.
+
+Usage: openclaw cron runs [options]
+
+Show cron run history (JSONL-backed)
+
+Options:
+  --expect-final   Wait for final response (agent) (default: false)
+  -h, --help       Display help for command
+  --id <id>        Job id
+  --limit <n>      Max entries (default 50) (default: "50")
+  --timeout <ms>   Timeout in ms (default: "30000")
+  --token <token>  Gateway token (if required)
+  --url <url>      Gateway WebSocket URL (defaults to gateway.remote.url when
+                   configured)

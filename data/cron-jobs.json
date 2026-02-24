@@ -1,0 +1,1046 @@
+{
+  "jobs": [
+    {
+      "id": "99451722-b6af-408b-a46f-cc6389e6e82a",
+      "agentId": "clark-workspace",
+      "name": "Cerebral Valley SF events catch-up PM run (temporary)",
+      "enabled": true,
+      "createdAtMs": 1771435271516,
+      "updatedAtMs": 1771966956301,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 15 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Cerebral Valley PM catch-up run — same optimized workflow as AM job.\n\nRules:\n- CV-driven queue, streaming execution (no staging list).\n- Only events TODAY → TODAY+21 days (America/Los_Angeles).\n- SF proper only; exclude DEI/female-only.\n- Skip Partiful, waitlists, and paid tickets.\n- Dedupe by URL via state file.\n- Use cursor resume (continue after cursor.lastProcessedUrl when present).\n- Normalize statuses (applied/pending_approval/skipped_*/blocked_*/timeout).\n- Only label wallet verification if explicitly shown.\n\nOutput: same 6-bullet executive summary format as AM job.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771974000000,
+        "lastRunAtMs": 1771887600013,
+        "lastStatus": "ok",
+        "lastDurationMs": 81351
+      }
+    },
+    {
+      "id": "c1c7ade6-a503-404f-a993-197dfb64a3f0",
+      "agentId": "clark-workspace",
+      "name": "Second Brain checkpoint + refile (mid afternoon)",
+      "enabled": true,
+      "createdAtMs": 1771913802570,
+      "updatedAtMs": 1771966957003,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 16 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Checkpoint + Second Brain refile: Review the last ~4 hours of our conversation and any new artifacts, then write durable notes into ~/Documents/openclaw-for-smb/second-brain/:\n- Create one dated inbox file in second-brain/inbox/ capturing key facts, decisions, tasks, and links.\n- If anything is clearly a workflow/SOP/customer note/decision, also refile into the appropriate folder.\nEnd with Next step or Done.",
+        "timeoutSeconds": 300,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1771977600000
+      }
+    },
+    {
+      "id": "a129f228-2c74-445d-bc63-c86882dc959b",
+      "agentId": "clark-workspace",
+      "name": "Memory checkpoint (mid afternoon)",
+      "enabled": true,
+      "createdAtMs": 1771914050209,
+      "updatedAtMs": 1771966957688,
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 16 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Memory checkpoint: write/append durable notes for continuity.\n- Summarize key decisions, tasks, and changes since last checkpoint.\n- Append to today’s workspace memory file: /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/memory/YYYY-MM-DD.md\n- If any item is long-term preference/guardrail, also promote to /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/MEMORY.md\nEnd with Next step or Done.",
+        "timeoutSeconds": 240,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1771977900000
+      }
+    },
+    {
+      "id": "6f329533-dc88-4fcb-a102-05a69dafa37d",
+      "agentId": "vlad",
+      "name": "orbit-eod-accountability-check",
+      "enabled": true,
+      "createdAtMs": 1771112508128,
+      "updatedAtMs": 1771966958394,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 17 * * 1-5",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Create a short Orbit end-of-day accountability check for Ryan. Include: (1) what should have been shipped today, (2) likely slipped items and recovery plan for tomorrow, (3) one message Ryan should send (partner/team/customer), (4) one metric to verify before end of day. Keep it practical and no fluff.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771983000000,
+        "lastRunAtMs": 1771896600015,
+        "lastStatus": "ok",
+        "lastDurationMs": 22515,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "4455e4c7-c83f-4329-be84-1090748614f4",
+      "agentId": "clark-workspace",
+      "name": "Daily Agent Learnings Digest (CEO consolidation)",
+      "enabled": true,
+      "createdAtMs": 1771564485698,
+      "updatedAtMs": 1771966959097,
+      "schedule": {
+        "kind": "cron",
+        "expr": "10 18 * * 1-5",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily CEO-style consolidation of learnings across agents (Clark hub).\n\nProcess:\n1) Inspect last 24h outputs from each agent (vlad, elon-robotaxi, brian-sphereone, satya2, and clark-workspace) using sessions_history where needed.\n2) Extract only concrete learnings that change behavior (playbooks, guardrails, gotchas, what worked).\n3) Deduplicate; keep the top 5 max.\n\nOutput (STRICT, max 7 bullets, <120 words):\n- Learnings: <1-5 bullets>\n- New guardrail to adopt: <0-1 bullet>\n- Decision needed from Ryan: <0-1 bullet>\n\nRules:\n- No narrative.\n- No restating routine status.\n- If there are no meaningful learnings, output exactly: NO_LEARNINGS\n\nAfter posting summary, append any durable guardrails to /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/memory/org-learnings.md (short bullet list, dated).",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771985400000,
+        "lastRunAtMs": 1771899000012,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 25638,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "2ad9a44c-3097-420f-bdb7-5e9fa1081b99",
+      "agentId": "clark-workspace",
+      "name": "Daily workflow audit (quality + cost + drift)",
+      "enabled": true,
+      "createdAtMs": 1771961380485,
+      "updatedAtMs": 1771966959791,
+      "schedule": {
+        "kind": "cron",
+        "expr": "45 21 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily workflow audit (last 24h):\n1) Review cron jobs + recent run history (errors, empty outputs, drift from priority-zero).\n2) Identify waste/cost risks (X credits, redundant runs, high token burn).\n3) Propose fixes: throttle, cache, fallbacks, disable low-value jobs.\n4) Persist a dated report to: ~/Documents/openclaw-for-smb/second-brain/build-notes/workflow-audit/YYYY-MM-DD.md\n5) If a workflow should be changed, open a small PR or write a concrete patch plan.\nEnd with Next step or Done.",
+        "timeoutSeconds": 420,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1771998300000
+      }
+    },
+    {
+      "id": "c95a6b1a-9a39-4efa-aace-38c99a53aea0",
+      "agentId": "clark-workspace",
+      "name": "Nightly learnings review (mistakes + fixes)",
+      "enabled": true,
+      "createdAtMs": 1771837415317,
+      "updatedAtMs": 1771966960497,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Nightly review (this is a recurring nightly reminder/task):\n\nGoal: reduce repeated mistakes.\n\nDo:\n1) Review today's conversation events + tool runs (use session history/logs if available) and the workspace daily log file `memory/YYYY-MM-DD.md` (today, America/Los_Angeles).\n2) Identify:\n   - What Clark got wrong / where execution derailed\n   - The confirmed fix / correct procedure (only if confirmed)\n3) Write updates:\n   - Append a concise \"## Learnings (YYYY-MM-DD)\" section to `memory/YYYY-MM-DD.md` with bullets: Mistake → Fix.\n   - Update `MEMORY.md` only with durable, reusable rules (\"keep me from repeating mistakes\").\n\nGuardrails:\n- Do not invent learnings; only record what actually happened and what was confirmed.\n- Keep it short (max ~20 lines/day).\n- No secrets/keys.\n\nFinish by posting a short STATUS summary + 1 NEXT action to keep us on track for $10M ARR / 6 months.",
+        "timeoutSeconds": 600,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771999200000,
+        "lastRunAtMs": 1771912876458,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 28908,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "cc2a8d74-e2e8-440b-9b47-dc85569ba43d",
+      "agentId": "vlad",
+      "name": "orbit-10pm-wow-overnight",
+      "enabled": true,
+      "createdAtMs": 1771564127525,
+      "updatedAtMs": 1771966961189,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Every night, pick ONE high-leverage action you can complete while Ryan sleeps that will materially move Orbit forward by morning. Prioritize action over documents. Examples of acceptable 'wow' outputs: (a) a fully prepared draft X post published ONLY after approval request is given (default: do not post), (b) a built/queued LaGrowthMachine campaign draft with a shareable link and staged messages (no sending), (c) a competitor pricing/positioning change alert with concrete counter-move plus ready-to-send replies, (d) a working dashboard/KPI snapshot file in repo with daily numbers populated if data available, (e) a list of 20 highly targeted leads with personalization lines + drafts staged.\n\nHard rules:\n- Do not send outreach or publish publicly without explicit prior approval in the chat.\n- Use Tavily as primary web research provider.\n- Use the humanizer skill ONLY for public-facing posts/copy.\n- Output must start with: WOW_DELIVERABLE: <one-line>\n- Then: WHAT'S READY (3 bullets max), WHERE TO FIND IT (link/path), WHAT YOU NEED TO DO (one action), and NEXT 1 MOVE.\n- If blocked, output WOW_BLOCKED with the single highest-signal unblock step and an alternative deliverable you shipped instead.\n\nMake it decisive and concrete.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771999200000,
+        "lastRunAtMs": 1771912800015,
+        "lastStatus": "ok",
+        "lastDurationMs": 76443,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "e241cfca-a966-450e-9a5d-9d88bb9e0e3f",
+      "agentId": "clark-workspace",
+      "name": "Nightly wow: relationship (10pm PT)",
+      "enabled": true,
+      "createdAtMs": 1771887954071,
+      "updatedAtMs": 1771966961880,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Nightly relationship wow (recurring nightly task).\n\nGoal: build trust + reduce Ryan’s worries.\n\nDo:\n1) Review today’s interactions + notes (memory/YYYY-MM-DD.md) and identify 1 friction point or tension.\n2) Produce ONE small thing that improves the relationship immediately (pick one):\n   - a tighter operating rule (short),\n   - a better default response pattern,\n   - a proactive check-in question that reduces ambiguity,\n   - or a small automation that reduces Ryan’s cognitive load.\n3) Write any durable rule to MEMORY.md (only if truly reusable) and log details in memory/YYYY-MM-DD.md.\n4) Send Ryan a short message: \"RELATIONSHIP:\" + what changed + why it helps.\n\nConstraints:\n- Must be concrete, not fluffy.\n- No secrets/keys.\n- Max 10 lines in the message.",
+        "timeoutSeconds": 600,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771999200000,
+        "lastRunAtMs": 1771912905366,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 35089,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "d7225ce4-70bf-4edd-b7f0-0c06c2736e51",
+      "agentId": "clark-workspace",
+      "name": "Nightly wow: $10M ARR execution (10:05pm PT)",
+      "enabled": true,
+      "createdAtMs": 1771887954079,
+      "updatedAtMs": 1771966962574,
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Nightly execution wow (recurring nightly task).\n\nGoal: advance Ryan toward $10M ARR in 6 months.\n\nDo:\n1) Review today’s interactions + current execution context (MEMORY.md + memory/YYYY-MM-DD.md).\n2) Generate ONE high-leverage artifact for tomorrow (pick one):\n   - a concrete outreach experiment (copy + target + metric),\n   - a prioritized build spec that converts to revenue,\n   - a pipeline/offer refinement,\n   - or a blocker-removal plan with the single next action.\n3) Output must include:\n   - \"WHY THIS MOVES REVENUE\"\n   - \"NEXT (15 MIN)\"\n   - \"NEXT (60–120 MIN)\"\n4) Log details to memory/YYYY-MM-DD.md; add only durable rules to MEMORY.md.\n\nConstraints:\n- Must be actionable and specific.\n- No busywork.\n- Max 20 lines in the message.",
+        "timeoutSeconds": 900,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771999500000,
+        "lastRunAtMs": 1771913100013,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 23864,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "febd17b2-41b6-4754-a968-baf307ed6200",
+      "agentId": "clark-workspace",
+      "name": "Memory checkpoint (night)",
+      "enabled": true,
+      "createdAtMs": 1771914050913,
+      "updatedAtMs": 1771966963280,
+      "schedule": {
+        "kind": "cron",
+        "expr": "20 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Night memory checkpoint: capture today’s durable progress + prevent loss on restart.\n- Append to today’s memory file (workspace).\n- Promote any durable rule to MEMORY.md.\nEnd with Next step or Done.",
+        "timeoutSeconds": 240,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772000400000
+      }
+    },
+    {
+      "id": "08a038d5-c561-4be6-ae72-dbcb9c8102c0",
+      "agentId": "clark-workspace",
+      "name": "Self-improvement review + log",
+      "enabled": true,
+      "createdAtMs": 1771914051618,
+      "updatedAtMs": 1771966963975,
+      "schedule": {
+        "kind": "cron",
+        "expr": "25 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Self-improvement review:\n- Scan today’s actions for (a) errors, (b) corrections from Ryan, (c) missing capabilities, (d) better recurring patterns.\n- Log to /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/.learnings/{ERRORS,LEARNINGS,FEATURE_REQUESTS}.md as appropriate.\n- If something should be promoted to AGENTS.md/TOOLS.md/MEMORY.md, propose it.\nEnd with Next step or Done.",
+        "timeoutSeconds": 240,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772000700000,
+        "lastRunAtMs": 1771914300015,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 43823,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "6d4bf0d6-8205-49d1-be4c-b81879130b75",
+      "agentId": "clark-workspace",
+      "name": "Second Brain checkpoint + refile (night)",
+      "enabled": true,
+      "createdAtMs": 1771913803274,
+      "updatedAtMs": 1771966964686,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 22 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Night checkpoint + Second Brain refile: Review today’s conversation + work shipped; write durable notes into ~/Documents/openclaw-for-smb/second-brain/.\n- Dated inbox file\n- Refile workflows/decisions/customers as needed\n- Add a short 'tomorrow start here' section.\nEnd with Next step or Done.",
+        "timeoutSeconds": 300,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772001000000,
+        "lastRunAtMs": 1771914600016,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 51672,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "a4a5353d-f6cf-4243-a3a7-c46e913ae504",
+      "agentId": "elon-robotaxi",
+      "name": "Overnight CEO Ops Sweep",
+      "enabled": true,
+      "createdAtMs": 1771112570248,
+      "updatedAtMs": 1771966965390,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 23 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Overnight proactive CEO ops sweep for Robotaxi vs PublicTransit. Do high-leverage internal work only unless an external/public action is explicitly authorized in prior messages. Priorities: (1) pipeline: identify new high-intent targets and draft outreach copy; (2) product: detect conversion, UX, or performance bottlenecks and propose/prepare fixes; (3) strategy: summarize relevant market/policy/competitor changes from the last 24h; (4) execution: produce a concise action list for next business day ranked by revenue impact. Deliver a short announce summary to Ryan with shipped outputs, blockers, and next actions.",
+        "thinking": "medium",
+        "timeoutSeconds": 900
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772004600000,
+        "lastRunAtMs": 1771918200012,
+        "lastStatus": "ok",
+        "lastDurationMs": 155946,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "d360ac69-aba6-4557-9af5-0cf253f4201d",
+      "agentId": "vlad",
+      "name": "orbit-overnight-deep-work",
+      "enabled": true,
+      "createdAtMs": 1771112574820,
+      "updatedAtMs": 1771966966087,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 1 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Overnight execution sprint for Orbit (action-first). Goal: deliver a ready-to-run outbound pipeline by morning using LinkedIn Sales Navigator + LaGrowthMachine.\n\nHard constraints from Ryan:\n- If a navigation pattern fails in LGM, do NOT repeat it. Record failure pattern and pivot to a new interaction strategy immediately.\n- Prefer deterministic flows: direct URLs, search/filter interactions, keyboard navigation, explicit waits for state change, then verify by reading visible UI state.\n- Avoid loops/retries on the same failing click path.\n\nRequired outputs:\n1) 25 high-fit targets (agent operators + crypto-native companies) with short rationale.\n2) One LGM campaign draft configured (sequence steps + personalization tokens).\n3) First 10 outbound messages drafted and staged for Ryan approval.\n\nDelivery format:\n- Start with STATUS: DONE / PARTIAL / BLOCKED.\n- If PARTIAL/BLOCKED, include exact failed action signatures and the alternative strategy attempted.\n- Include the shortest manual unblock checklist Ryan can run in under 5 minutes.\n\nRules:\n- Queue only; do not send outreach automatically without explicit approval.\n- Action over documents; only include details needed to execute tomorrow morning.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772011800000,
+        "lastRunAtMs": 1771925400014,
+        "lastStatus": "ok",
+        "lastDurationMs": 183473,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "35fd3a3e-024e-40ba-8e3f-7b5bbce4f89f",
+      "agentId": "clark-workspace",
+      "name": "Agent process watchdog",
+      "enabled": true,
+      "createdAtMs": 1771431633359,
+      "updatedAtMs": 1771966966778,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 3 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run a lightweight agent/process audit and only alert on anomalies.\n\nChecks:\n1) `process(action=\"list\")` for active background exec sessions.\n2) `sessions_list(activeMinutes=120, limit=100)` for active agent sessions.\n3) For any suspicious session (e.g., repeated process polling loops, repeated web_search bursts, long-running subprocess for simple tasks), inspect with `sessions_history(..., includeTools=true)`.\n\nAlert criteria (send concise alert only if true):\n- A background exec session appears stuck/repeating without progress.\n- Repeated web_search calls causing 429-like behavior in a single task.\n- Agent uses subprocess/coding-runner for simple local repo planning task.\n\nIf no anomalies, return exactly: NO_ISSUES\n\nSafety:\n- Do not kill processes automatically.\n- Do not modify config.\n- If anomaly found, include: agent/session key, concrete evidence (tool-call pattern), and recommended immediate action.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772017200000,
+        "lastRunAtMs": 1771930800016,
+        "lastStatus": "ok",
+        "lastDurationMs": 13453,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "4f9c4398-c770-4bb8-9f5b-03ab2d1535c9",
+      "agentId": "clark-workspace",
+      "name": "Daily auto-updater (OpenClaw + skills)",
+      "enabled": true,
+      "createdAtMs": 1771359298972,
+      "updatedAtMs": 1771966967469,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run daily maintenance updates (npm-first on this host).\n\nTasks:\n1) Run `openclaw doctor --non-interactive` and summarize warnings.\n2) Update OpenClaw via npm directly:\n   - Run `npm i -g openclaw@latest`.\n   - Verify final version with `openclaw --version`.\n   - (Skip `gateway update.run` entirely on this host.)\n3) Update skills with retry logic:\n   - Run `clawhub update --all --no-input --force`.\n   - If output contains `Rate limit exceeded`, retry up to 3 times with backoff (15s, 45s, 90s).\n4) Report concise summary:\n   - OpenClaw: npm update result + resulting version\n   - Skills: updated list + any failures with exact error text\n   - Any persistent blockers\n\nSafety:\n- Do not modify unrelated config.\n- Continue remaining steps if one fails and report details.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772028000000,
+        "lastRunAtMs": 1771941600017,
+        "lastStatus": "ok",
+        "lastDurationMs": 172370,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "e28ac797-5e61-46cc-a467-02816cec532a",
+      "agentId": "elon-robotaxi",
+      "name": "Pre-Dawn CEO Brief",
+      "enabled": true,
+      "createdAtMs": 1771112570255,
+      "updatedAtMs": 1771966968162,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 6 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate and send a morning CEO brief for Ryan McNutt (Robotaxi vs PublicTransit). Keep it ruthless and concise. Include: top 3 opportunities, top 3 risks, today's highest-leverage actions, and decisions needed. Tie each item to revenue, moat, or momentum. Include concrete next steps.",
+        "thinking": "medium",
+        "timeoutSeconds": 600
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772029800000,
+        "lastRunAtMs": 1771943400016,
+        "lastStatus": "ok",
+        "lastDurationMs": 48241,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "23423cc5-146b-4d1c-a3eb-796e3c2ff063",
+      "agentId": "vlad",
+      "name": "orbit-preopen-brief",
+      "enabled": true,
+      "createdAtMs": 1771112578810,
+      "updatedAtMs": 1771966968855,
+      "schedule": {
+        "kind": "cron",
+        "expr": "45 6 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Prepare Ryan's pre-open Orbit brief before morning work starts. Include: (1) overnight market/context shifts relevant to Orbit positioning (in plain 'markets' language), (2) today's top 3 execution priorities, (3) one tweet recommendation, (4) one partnership action, (5) one product action ready to ship. Keep it blunt and short.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772030700000,
+        "lastRunAtMs": 1771944300014,
+        "lastStatus": "ok",
+        "lastDurationMs": 39200,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "a9f910f2-43bf-46ac-b73e-e693b4a7e491",
+      "agentId": "clark-workspace",
+      "name": "Daily X market research (OpenClaw-for-SMB)",
+      "enabled": true,
+      "createdAtMs": 1771912778605,
+      "updatedAtMs": 1771966969554,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 7 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily market research (X + web search fallback) for OpenClaw-for-SMB.\n1) Try X API search via: python3 /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/scripts/market_research_x.py\n   - If it errors with 402/CreditsDepleted or returns 0 hits: fall back to web search.\n2) Web search fallback (Brave primary, Tavily fallback):\n   - Use Brave web_search for: (a) OpenClaw security + safe mode, (b) AI outbound deliverability, (c) agent workflow marketplace.\n   - If Brave errors/rate-limits: use Tavily skill:\n     node /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/skills/tavily-search/scripts/search.mjs \"QUERY\" -n 5 --topic news --days 1\n3) Output:\n- 3 problems (with evidence links) + 1 proposed product response each.\n- Save findings into ~/Documents/openclaw-for-smb/second-brain/market-research/ as a dated markdown file.\nEnd with Next step or Done.",
+        "timeoutSeconds": 180,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772031600000,
+        "lastRunAtMs": 1771945200015,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 48713,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "12dfcb34-8458-44fd-bfb5-e3c1a8a92208",
+      "agentId": "clark-workspace",
+      "name": "Daily Reddit market research (OpenClaw-for-SMB)",
+      "enabled": true,
+      "createdAtMs": 1771912779315,
+      "updatedAtMs": 1771966970266,
+      "schedule": {
+        "kind": "cron",
+        "expr": "10 7 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run Reddit market research for OpenClaw-for-SMB wedge (Outbound Pack + SMB automation pain).\n- Execute: python3 /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/scripts/market_research_reddit.py\n- Then add: 3 problems (with thread links) + 1 proposed product response each.\n- If one item is extremely compelling, propose a PR idea (do NOT auto-merge).",
+        "timeoutSeconds": 180,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772032200000,
+        "lastRunAtMs": 1771945800016,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 38477,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "128f9abf-91d5-499d-880d-d2f5660a1b1c",
+      "agentId": "clark-workspace",
+      "name": "Daily market research sweep (Reddit + X)",
+      "enabled": true,
+      "createdAtMs": 1771490650971,
+      "updatedAtMs": 1771966970970,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 7 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily market research sweep focused on Ryan’s active products.\n\nInputs (until Ryan specifies otherwise):\n- Keywords: SphereOne, Orbit, Robotaxi, LaGrowthMachine, OpenClaw, \"agentic workflow\", \"sales automation\", \"outbound\", \"lead gen\", \"cold email\", \"campaign\", \"deliverability\"\n\nReddit (use browser; logged-in session if available):\n1) Search Reddit for each keyword (time filter: past 24h when available).\n2) Prioritize posts that describe: pain, churn reasons, tool complaints, feature requests, pricing objections.\n3) Collect up to 5 highest-signal findings total.\n\nX/Twitter:\n1) Attempt X API recent search for the same keywords using bearer token auth (do NOT URL-decode; use token as stored).\n2) If X API access fails (permissions/429), report as BLOCKED and skip.\n\nOutput format (STRICT, max 7 bullets, <110 words):\n- Top pain point #1: <one line> (source: reddit/x, link)\n- Top pain point #2: ...\n- Top pain point #3: ...\n- Emerging opportunity: <one line>\n- Competitive intel: <one line>\n- Suggested product/growth action: <one line>\n- Needs Ryan input: <only if needed, ask for subreddits/keywords>\n\nRules:\n- No long narrative.\n- Do not engage/comment/post.\n- Prefer direct links to the threads/tweets.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772033400000,
+        "lastRunAtMs": 1771947000013,
+        "lastStatus": "ok",
+        "lastDurationMs": 69016,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "48d129f9-e3e5-427e-bcf3-ae377f782a80",
+      "agentId": "clark-workspace",
+      "name": "Daily kickoff (8:00am PT)",
+      "enabled": true,
+      "createdAtMs": 1771888304620,
+      "updatedAtMs": 1771966971663,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily Kickoff (every day at 8:00am PT):\n\nProduce a tight update for Ryan in this exact format:\n\nSTATUS:\n- What changed since yesterday (systems, crons, blockers, wins)\n- Anything that needs Ryan’s decision today\n\nNEXT:\n- The single highest-leverage next action for $10M ARR / 6 months\n- Include a fallback if blocked\n\nWIP LIMITS:\n- NOW: max 3 items\n- NEXT: max 5 items\n- Everything else goes to ICEBOX\n\nGuardrails:\n- Be blunt.\n- If you’re unsure, ask 1–2 precise questions.\n- No busywork.",
+        "timeoutSeconds": 600,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772035200000,
+        "lastRunAtMs": 1771948853316,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 36276,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "919a12fb-bcfa-44a5-affe-4cf3737c55f0",
+      "agentId": "vlad",
+      "name": "orbit-daily-ceo-brief",
+      "enabled": true,
+      "createdAtMs": 1771112504092,
+      "updatedAtMs": 1771966972364,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Prepare Ryan's daily Orbit CEO brief for today. Keep it blunt and concise. Include: (1) top 3 priorities for today, (2) top 3 risks/blockers, (3) decisions Ryan should make today, (4) one 60-minute high-leverage task, (5) one growth action and one product action, (6) what to ignore today. Use current known context from prior Orbit docs/tasks; if data is uncertain, state assumptions explicitly.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772035200000,
+        "lastRunAtMs": 1771948800015,
+        "lastStatus": "ok",
+        "lastDurationMs": 53301,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "a5c909ed-ac6c-4964-b003-23305a957667",
+      "agentId": "clark-workspace",
+      "name": "Morning Wow + Priority Zero",
+      "enabled": true,
+      "createdAtMs": 1771911761290,
+      "updatedAtMs": 1771966973056,
+      "schedule": {
+        "kind": "cron",
+        "expr": "15 8 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily 8:15am Morning Brief (OpenClaw-for-SMB):\n1) Today’s outcome goal (1 sentence, revenue-facing).\n2) 3 highest-leverage things I can do for you today to move toward M ARR in 6 months (each with next action + required input from Ryan).\n3) Top risks/blocks + what I’ll do to unblock.\nKeep concise and execution-focused.",
+        "timeoutSeconds": 120,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772036100000,
+        "lastRunAtMs": 1771949700015,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 31946,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "4c72d63e-ac77-402f-afc5-fb200b7ffbac",
+      "agentId": "vlad",
+      "name": "orbit-x-trend-scout-and-post-draft",
+      "enabled": true,
+      "createdAtMs": 1771110277983,
+      "updatedAtMs": 1771966973751,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 8 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "You are supporting Ryan on Orbit growth. Build daily X content ideas for https://x.com/orbitfinance_ using a calm, product-first, consumer-utility voice (Robinhood-style clarity, but original wording). Avoid direct crypto/DeFi jargon and avoid speculation framing; use 'markets', 'automation', 'execution', 'risk controls', 'everyday users'. Output: 3 timely angles, 5 short post drafts (<240 chars), 1 thread draft (3-5 posts), and best posting windows in PT today. Focus on what Orbit can do now, practical use cases, and trust/controls. Do NOT publish externally. Deliver drafts back in chat for approval.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772037000000,
+        "lastRunAtMs": 1771950600015,
+        "lastStatus": "ok",
+        "lastDurationMs": 31234,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "053410cd-4ce9-431e-8abd-6826da3d40f0",
+      "agentId": "clark-workspace",
+      "name": "Cerebral Valley SF events daily apply",
+      "enabled": true,
+      "createdAtMs": 1771317338323,
+      "updatedAtMs": 1771966974452,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Cerebral Valley event apply — optimized workflow (CV-driven queue + cursor resume).\n\nCore approach:\n- Treat Cerebral Valley as the queue. Do NOT build a separate candidate list.\n- Process CV events top→bottom and execute immediately per event.\n- Maintain idempotency + resume via state file: /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/memory/cerebralvalley-applied-events.json\n\nHard filters (before click-through when possible):\n- Date window: ONLY events happening TODAY through TODAY+21 days in America/Los_Angeles. Skip past events.\n- SF proper only.\n- Exclude DEI-focused and female-only events.\n- Skip Partiful links entirely.\n- Skip waitlist-only events (do not join waitlists).\n- Skip paid-ticket-required events (no purchases).\n- Deduplicate by URL against state file (do not re-apply).\n\nExecution loop (streaming):\nFor each eligible CV card:\n1) Click through to event page.\n2) Attempt RSVP/Request-to-Join immediately (unattended-safe only).\n3) Classify result into normalized statuses:\n   - applied\n   - pending_approval (counts as success)\n   - skipped_waitlist\n   - skipped_paid\n   - skipped_past\n   - skipped_partiful\n   - blocked_verification (captcha/SMS/wallet/email-reactivation/other explicit gate)\n   - blocked_missing_info (required fields we cannot confidently fill)\n   - timeout\n4) Persist/update the event entry (by URL) in state file.\n5) Update cursor after EACH processed event: cursor.lastProcessedUrl + cursor.lastProcessedEventDate + cursor.lastRunStartedAt.\n6) Return to CV list and continue.\n\nCursor resume behavior:\n- If cursor.lastProcessedUrl is set, scan CV list until that URL is encountered, then continue AFTER it.\n- If not found (list changed), start from top but still skip any URLs already present in state.\n\nWallet verification labeling rule:\n- Only say wallet verification if the UI explicitly mentions wallet/token verification.\n\nOutput format (STRICT, max 6 bullets):\n- Applied: <count> (<names>)\n- Pending approval: <count> (<names>)\n- Skipped: <count> (<waitlist/paid/past/partiful>)\n- Blocked: <count> (<short reasons>)\n- Timed out: <count> (<names>)\n- Next action needed from Ryan: <none/one-line>\n\nKeep concise, no narrative.",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1772038800000,
+        "lastRunAtMs": 1771952400015,
+        "lastStatus": "ok",
+        "lastDurationMs": 89477,
+        "lastRunStatus": "ok",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "f65a5947-6339-4dea-b401-7f3528923826",
+      "agentId": "clark-workspace",
+      "name": "Daily self-improvement research loop",
+      "enabled": true,
+      "createdAtMs": 1771913451187,
+      "updatedAtMs": 1771966975154,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily 9:00am PT: research how to improve our OpenClaw instance + OpenClaw-for-SMB product.\n- Pull: X + Reddit outputs (from earlier runs), plus 1 new source (article or YouTube) focused on OpenClaw/agents/workflows.\n- Output: 3 concrete improvements (workflow/SOP/skill/config/coding) + effort estimate.\n- If one is high-confidence and <1 day scope, propose a PR.\n- If it requires new skills, propose which ClawHub skill and why.",
+        "timeoutSeconds": 300,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772038800000,
+        "lastRunAtMs": 1771952489492,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 171732,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "fa3203b7-6db6-4297-ab35-918e4d8a69be",
+      "agentId": "clark-workspace",
+      "name": "Second Brain checkpoint + refile (late morning)",
+      "enabled": true,
+      "createdAtMs": 1771913801871,
+      "updatedAtMs": 1771966975848,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 11 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Checkpoint + Second Brain refile: Review the last ~4 hours of our conversation and any new artifacts, then write durable notes into ~/Documents/openclaw-for-smb/second-brain/:\n- Create one dated inbox file in second-brain/inbox/ capturing key facts, decisions, tasks, and links.\n- If anything is clearly a workflow/SOP/customer note/decision, also refile into the appropriate folder.\nEnd with Next step or Done.",
+        "timeoutSeconds": 300,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772046000000,
+        "lastRunAtMs": 1771959600016,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 45276,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "1a3dc3d7-bb4c-4680-ae9b-9e066fadb1a5",
+      "agentId": "clark-workspace",
+      "name": "Memory checkpoint (late morning)",
+      "enabled": true,
+      "createdAtMs": 1771914049507,
+      "updatedAtMs": 1771966976543,
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 11 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Memory checkpoint: write/append durable notes for continuity.\n- Summarize key decisions, tasks, and changes since last checkpoint.\n- Append to today’s workspace memory file: /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/memory/YYYY-MM-DD.md\n- If any item is long-term preference/guardrail, also promote to /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/MEMORY.md\nEnd with Next step or Done.",
+        "timeoutSeconds": 240,
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772046300000,
+        "lastRunAtMs": 1771959900014,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 39736,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    },
+    {
+      "id": "292cb84d-2c18-42c4-ab56-a8730b23d99e",
+      "agentId": "clark-workspace",
+      "name": "Noon CEO-of-everything onboarding Q&A",
+      "enabled": true,
+      "createdAtMs": 1771913803982,
+      "updatedAtMs": 1771966977232,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 12 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "CEO-of-everything onboarding (5 minutes): ask Ryan 2 high-leverage questions to reduce ambiguity and increase proactive execution. Questions should be specific (choices where possible) and targeted at today’s bottleneck. Capture answers into second-brain/decisions/ or second-brain/customers/ as appropriate.",
+        "timeoutSeconds": 180,
+        "model": "openai-codex/gpt-5.2",
+        "thinking": "medium"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "telegram:5170438387"
+      },
+      "state": {
+        "nextRunAtMs": 1772049600000,
+        "lastRunAtMs": 1771963200015,
+        "lastRunStatus": "error",
+        "lastStatus": "error",
+        "lastDurationMs": 1070,
+        "lastError": "cron announce delivery failed",
+        "lastDeliveryStatus": "unknown",
+        "consecutiveErrors": 1
+      }
+    }
+  ],
+  "total": 31,
+  "offset": 0,
+  "limit": 31,
+  "hasMore": false,
+  "nextOffset": null
+}

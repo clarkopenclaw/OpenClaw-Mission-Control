@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mission Control</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <h1>Mission Control</h1>
+      <div class="sub">Local dashboard for OpenClaw cron + workflow health</div>
+    </div>
+    <div class="actions">
+      <button id="reload">Reload data</button>
+      <a class="button" href="http://127.0.0.1:18789/" target="_blank" rel="noreferrer">OpenClaw Control UI</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Data</h2>
+      <div id="meta" class="mono">Loading…</div>
+      <div class="hint">Run <code>~/Documents/mission-control/refresh.sh</code> to refresh JSON.</div>
+    </section>
+
+    <section class="card">
+      <h2>Cron jobs</h2>
+      <div class="filters">
+        <input id="q" placeholder="Filter by name/agent…" />
+        <label><input type="checkbox" id="onlyEnabled" /> Enabled only</label>
+      </div>
+      <div id="jobs">Loading…</div>
+    </section>
+
+    <section class="card">
+      <h2>Workflow audit reports (Second Brain)</h2>
+      <div class="hint">
+        Folder: <code>~/Documents/openclaw-for-smb/second-brain/build-notes/workflow-audit/</code>
+      </div>
+      <div id="audit">Loading…</div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
