@@ -32,7 +32,7 @@ npm run dev
 http://localhost:5173
 ```
 
-The app reads from `/data/*.json` (`data/cron-jobs.json`, `data/agents.json`, `data/meta.json`).
+The app reads from `/data/*.json` (generated under `public/data/cron-jobs.json`, `public/data/agents.json`, `public/data/meta.json`).
 
 ## Validate OpenClaw JSON parsing
 ```bash

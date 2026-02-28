@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATA_DIR="$ROOT_DIR/data"
+DATA_DIR="$ROOT_DIR/public/data"
 mkdir -p "$DATA_DIR"
 
 # Jobs list
