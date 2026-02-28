@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Cron } from 'croner';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -31,6 +32,24 @@ type Agent = {
   defaults?: { model?: { primary?: string } | string };
   agentDefaults?: { model?: string };
 };
+
+type CronView = 'table' | 'agenda';
+
+type AgendaItem = {
+  runAtMs: number;
+  job: CronJob;
+  agentId: string;
+  enabled: boolean;
+  status: string;
+  scheduleExpr: string;
+  scheduleTz: string;
+  wasCapped: boolean;
+};
+
+const AGENDA_LOOKAHEAD_DAYS = 7;
+const MAX_RUNS_PER_JOB = 20;
+const MAX_RUNS_PER_NOISY_JOB = 7;
+const MAX_ITERATIONS_PER_JOB = 500;
 
 function isRecord(value: unknown): value is AnyRecord {
   return Boolean(value) && typeof value === 'object';
@@ -126,6 +145,121 @@ function badgeClass(value: string): string {
   return 'badge';
 }
 
+function formatTime(epochMs: number, timeZone?: string): string {
+  const options: Intl.DateTimeFormatOptions = {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  };
+
+  if (timeZone) {
+    options.timeZone = timeZone;
+  }
+
+  return new Date(epochMs).toLocaleTimeString(undefined, options);
+}
+
+function formatDayHeading(epochMs: number): string {
+  return new Date(epochMs).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function dateKey(epochMs: number, timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone,
+  }).formatToParts(new Date(epochMs));
+
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function getCronExpr(schedule?: CronJob['schedule']): string {
+  if (!schedule || schedule.kind !== 'cron') {
+    return '';
+  }
+  return schedule.expr || schedule.cron || '';
+}
+
+function getCronTz(schedule?: CronJob['schedule']): string {
+  if (!schedule || schedule.kind !== 'cron') {
+    return '';
+  }
+  return schedule.tz || schedule.timezone || '';
+}
+
+function upcomingRunsForJob(job: CronJob, startAtMs: number, endAtMs: number): { runs: number[]; wasCapped: boolean } {
+  const expr = getCronExpr(job.schedule);
+  if (!expr) {
+    return { runs: [], wasCapped: false };
+  }
+
+  const timezone = getCronTz(job.schedule);
+
+  try {
+    const cron = new Cron(expr, {
+      timezone: timezone || undefined,
+      mode: '5-part',
+      legacyMode: true,
+    });
+
+    const runs: number[] = [];
+    let cursor = new Date(startAtMs);
+
+    for (let i = 0; i < MAX_ITERATIONS_PER_JOB; i += 1) {
+      const next = cron.nextRun(cursor);
+      if (!next) break;
+
+      const nextMs = next.getTime();
+      if (nextMs > endAtMs) break;
+
+      runs.push(nextMs);
+
+      // Avoid accidental infinite loops if a library returns the same run time.
+      cursor = new Date(nextMs + 1000);
+
+      // For very noisy schedules, stop collecting candidates once we know we must cap.
+      if (runs.length > MAX_RUNS_PER_JOB * 6) {
+        break;
+      }
+    }
+
+    if (runs.length <= MAX_RUNS_PER_JOB) {
+      return { runs, wasCapped: false };
+    }
+
+    // Decide if this is "noisy" (e.g. */30). If so, show at most 1 run/day.
+    const NOISY_INTERVAL_MS = 2 * 60 * 60 * 1000;
+    const minGapMs = runs.length >= 2 ? Math.min(...runs.slice(1).map((ms, idx) => ms - runs[idx])) : Infinity;
+    const isNoisy = minGapMs < NOISY_INTERVAL_MS;
+
+    if (!isNoisy) {
+      return { runs: runs.slice(0, MAX_RUNS_PER_JOB), wasCapped: true };
+    }
+
+    // Noisy schedule: show only the first run per day in the job's timezone (or local if tz missing).
+    const capped: number[] = [];
+    const seenDays = new Set<string>();
+
+    for (const runAtMs of runs) {
+      const key = dateKey(runAtMs, timezone || undefined);
+      if (seenDays.has(key)) continue;
+      seenDays.add(key);
+      capped.push(runAtMs);
+      if (capped.length >= MAX_RUNS_PER_NOISY_JOB) break;
+    }
+
+    return { runs: capped, wasCapped: true };
+  } catch {
+    return { runs: [], wasCapped: false };
+  }
+}
+
 export default function App() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [modelByAgentId, setModelByAgentId] = useState<Record<string, string>>({});
@@ -134,6 +268,7 @@ export default function App() {
   const [query, setQuery] = useState<string>('');
   const [enabledOnly, setEnabledOnly] = useState<boolean>(false);
   const [refreshHint, setRefreshHint] = useState<string>('');
+  const [cronView, setCronView] = useState<CronView>('table');
 
   useEffect(() => {
     void (async () => {
@@ -203,6 +338,58 @@ export default function App() {
     });
   }, [enabledOnly, jobs, query]);
 
+  const agendaByDay = useMemo(() => {
+    const startAtMs = Date.now();
+    const endAtMs = startAtMs + AGENDA_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000;
+
+    const items: AgendaItem[] = [];
+
+    for (const job of filteredJobs) {
+      const expr = getCronExpr(job.schedule);
+      const tz = getCronTz(job.schedule);
+      if (!expr) continue;
+
+      const { runs, wasCapped } = upcomingRunsForJob(job, startAtMs, endAtMs);
+
+      for (const runAtMs of runs) {
+        const agentId = job.agentId || '(default)';
+        const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+
+        items.push({
+          runAtMs,
+          job,
+          agentId,
+          enabled: Boolean(job.enabled),
+          status,
+          scheduleExpr: expr,
+          scheduleTz: tz,
+          wasCapped,
+        });
+      }
+    }
+
+    items.sort((a, b) => {
+      if (a.runAtMs !== b.runAtMs) return a.runAtMs - b.runAtMs;
+      return String(a.job.name || '').localeCompare(String(b.job.name || ''));
+    });
+
+    const groups = new Map<string, { headingMs: number; items: AgendaItem[] }>();
+
+    for (const item of items) {
+      const key = dateKey(item.runAtMs);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.set(key, { headingMs: item.runAtMs, items: [item] });
+      }
+    }
+
+    return Array.from(groups.entries())
+      .map(([key, value]) => ({ key, heading: formatDayHeading(value.headingMs), items: value.items }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+  }, [filteredJobs]);
+
   return (
     <>
       <header className="header">
@@ -227,12 +414,33 @@ export default function App() {
         <section className="card">
           <h2>Data</h2>
           <div className="mono">Generated: {generatedAt}</div>
-          <div className="hint">Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>.</div>
+          <div className="hint">
+            Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>.
+          </div>
           {refreshHint ? <div className="hint">{refreshHint}</div> : null}
         </section>
 
         <section className="card">
-          <h2>Cron jobs</h2>
+          <div className="card-title">
+            <h2>Cron jobs</h2>
+            <div className="segmented" role="group" aria-label="Cron jobs view">
+              <button
+                type="button"
+                className={cronView === 'table' ? 'seg active' : 'seg'}
+                onClick={() => setCronView('table')}
+              >
+                Table
+              </button>
+              <button
+                type="button"
+                className={cronView === 'agenda' ? 'seg active' : 'seg'}
+                onClick={() => setCronView('agenda')}
+              >
+                Agenda
+              </button>
+            </div>
+          </div>
+
           <div className="filters">
             <input
               id="q"
@@ -241,71 +449,118 @@ export default function App() {
               placeholder="Filter by name/agent…"
             />
             <label>
-              <input
-                type="checkbox"
-                checked={enabledOnly}
-                onChange={(event) => setEnabledOnly(event.target.checked)}
-              />{' '}
+              <input type="checkbox" checked={enabledOnly} onChange={(event) => setEnabledOnly(event.target.checked)} />{' '}
               Enabled only
             </label>
           </div>
 
           {error ? <div className="small">Failed to load jobs: {error}. Run ./refresh.sh.</div> : null}
 
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Agent</th>
-                <th>Model</th>
-                <th>Thinking</th>
-                <th>Enabled</th>
-                <th>Schedule</th>
-                <th>Next</th>
-                <th>Last</th>
-                <th>Last status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredJobs.length === 0 ? (
+          {cronView === 'table' ? (
+            <table className="table">
+              <thead>
                 <tr>
-                  <td colSpan={9} className="small">
-                    No jobs match filter.
-                  </td>
+                  <th>Name</th>
+                  <th>Agent</th>
+                  <th>Model</th>
+                  <th>Thinking</th>
+                  <th>Enabled</th>
+                  <th>Schedule</th>
+                  <th>Next</th>
+                  <th>Last</th>
+                  <th>Last status</th>
                 </tr>
-              ) : (
-                filteredJobs.map((job, index) => {
-                  const agentId = job.agentId || '(default)';
-                  const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '—';
-                  const thinking = job.payload?.thinking || job.thinking || '—';
-                  const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+              </thead>
+              <tbody>
+                {filteredJobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="small">
+                      No jobs match filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredJobs.map((job, index) => {
+                    const agentId = job.agentId || '(default)';
+                    const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '—';
+                    const thinking = job.payload?.thinking || job.thinking || '—';
+                    const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
 
-                  return (
-                    <tr key={job.id || `${job.name || 'job'}-${index}`}>
-                      <td>
-                        <div>
-                          <b>{job.name || '—'}</b>
-                        </div>
-                        <div className="small mono">{job.id || '—'}</div>
-                      </td>
-                      <td className="mono">{agentId}</td>
-                      <td className="mono">{model}</td>
-                      <td className="mono">{thinking}</td>
-                      <td>
-                        <span className="badge">{job.enabled ? 'enabled' : 'disabled'}</span>
-                      </td>
-                      <td className="mono">{formatSchedule(job.schedule)}</td>
-                      <td className="mono">{formatDateFromMs(job.state?.nextRunAtMs)}</td>
-                      <td className="mono">{formatDateFromMs(job.state?.lastRunAtMs)}</td>
-                      <td>
-                        <span className={badgeClass(status)}>{status}</span>
-                      </td>
-                    </tr>
-                  );
-                })
+                    return (
+                      <tr key={job.id || `${job.name || 'job'}-${index}`}>
+                        <td>
+                          <div>
+                            <b>{job.name || '—'}</b>
+                          </div>
+                          <div className="small mono">{job.id || '—'}</div>
+                        </td>
+                        <td className="mono">{agentId}</td>
+                        <td className="mono">{model}</td>
+                        <td className="mono">{thinking}</td>
+                        <td>
+                          <span className="badge">{job.enabled ? 'enabled' : 'disabled'}</span>
+                        </td>
+                        <td className="mono">{formatSchedule(job.schedule)}</td>
+                        <td className="mono">{formatDateFromMs(job.state?.nextRunAtMs)}</td>
+                        <td className="mono">{formatDateFromMs(job.state?.lastRunAtMs)}</td>
+                        <td>
+                          <span className={badgeClass(status)}>{status}</span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <div className="agenda">
+              <div className="agenda-meta small">
+                Upcoming runs for the next {AGENDA_LOOKAHEAD_DAYS} days. Noisy schedules are capped to one run/day.
+              </div>
+
+              {agendaByDay.length === 0 ? (
+                <div className="small">No upcoming runs found (or no cron expressions in current filter).</div>
+              ) : (
+                agendaByDay.map((group) => (
+                  <div key={group.key} className="agenda-day">
+                    <h3 className="agenda-heading">{group.heading}</h3>
+                    <div className="agenda-list">
+                      {group.items.map((item) => {
+                        const model = modelByAgentId[item.agentId] || modelByAgentId['(default)'] || '—';
+                        const jobTz = item.scheduleTz;
+
+                        return (
+                          <div key={`${item.job.id || item.job.name}-${item.runAtMs}`} className="agenda-item">
+                            <div className="agenda-time">
+                              <div className="mono">{formatTime(item.runAtMs)}</div>
+                              {jobTz ? (
+                                <div className="small mono">
+                                  {formatTime(item.runAtMs, jobTz)} ({jobTz})
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="agenda-body">
+                              <div className="agenda-title">
+                                <b>{item.job.name || '—'}</b>
+                                <span className="badge">{item.enabled ? 'enabled' : 'disabled'}</span>
+                                <span className={badgeClass(item.status)}>{item.status}</span>
+                                {item.wasCapped ? <span className="badge idle">capped</span> : null}
+                              </div>
+                              <div className="small mono">Agent: {item.agentId} · Model: {model}</div>
+                              <div className="small mono">
+                                cron {item.scheduleExpr}
+                                {jobTz ? ` @ ${jobTz}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
               )}
-            </tbody>
-          </table>
+            </div>
+          )}
         </section>
       </main>
     </>
