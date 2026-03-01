@@ -524,7 +524,7 @@ export default function App() {
                 className={cronView === 'week' ? 'seg active' : 'seg'}
                 onClick={() => setCronView('week')}
               >
-                Week
+                Calendar
               </button>
               <button
                 type="button"
@@ -669,7 +669,7 @@ export default function App() {
           {cronView === 'week' ? (
             <div className="week">
               <div className="agenda-meta small">
-                Week view ({week.label}). Upcoming run <b>instances</b> only. Noisy schedules are capped to one run/day.
+                Calendar view ({week.label}). Upcoming run <b>instances</b> only. Noisy schedules are capped to one run/day.
                 {week.wasGlobalCapped ? (
                   <span>
                     {' '}
@@ -678,7 +678,7 @@ export default function App() {
                 ) : null}
               </div>
 
-              <div className="week-grid" role="grid" aria-label="Weekly cron calendar">
+              <div className="week-grid" role="grid" aria-label="Cron calendar">
                 {week.days.map((day) => (
                   <div key={day.key} className="week-day" role="gridcell">
                     <div className="week-day-header">
