@@ -215,6 +215,76 @@ code {
   background: #fafbff;
 }
 
+.week {
+  display: grid;
+  gap: 14px;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(160px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.week-day {
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  background: #fafbff;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  min-height: 180px;
+}
+
+.week-day-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.week-day-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.week-day-list {
+  display: grid;
+  gap: 8px;
+}
+
+.week-item {
+  border: 1px solid #e6e8ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.week-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.week-item-title {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.week-item-time {
+  color: #111;
+}
+
+.week-item-meta {
+  color: #666;
+}
+
 .agenda-title {
   display: flex;
   flex-wrap: wrap;

@@ -33,7 +33,7 @@ type Agent = {
   agentDefaults?: { model?: string };
 };
 
-type CronView = 'table' | 'agenda';
+type CronView = 'table' | 'week' | 'agenda';
 
 type AgendaItem = {
   runAtMs: number;
@@ -46,10 +46,18 @@ type AgendaItem = {
   wasCapped: boolean;
 };
 
+type AgendaGroup = {
+  key: string;
+  heading: string;
+  items: AgendaItem[];
+};
+
 const AGENDA_LOOKAHEAD_DAYS = 7;
 const MAX_RUNS_PER_JOB = 20;
 const MAX_RUNS_PER_NOISY_JOB = 7;
 const MAX_ITERATIONS_PER_JOB = 500;
+const MAX_AGENDA_ITEMS_TOTAL = 250;
+const WEEK_STARTS_ON: 0 | 1 = 1; // 0 = Sunday, 1 = Monday
 
 function isRecord(value: unknown): value is AnyRecord {
   return Boolean(value) && typeof value === 'object';
@@ -193,6 +201,16 @@ function getCronTz(schedule?: CronJob['schedule']): string {
   return schedule.tz || schedule.timezone || '';
 }
 
+function startOfWeekMs(epochMs: number, weekStartsOn: 0 | 1): number {
+  const d = new Date(epochMs);
+  d.setHours(0, 0, 0, 0);
+
+  const day = d.getDay();
+  const diff = (day - weekStartsOn + 7) % 7;
+  d.setDate(d.getDate() - diff);
+  return d.getTime();
+}
+
 function upcomingRunsForJob(job: CronJob, startAtMs: number, endAtMs: number): { runs: number[]; wasCapped: boolean } {
   const expr = getCronExpr(job.schedule);
   if (!expr) {
@@ -260,6 +278,59 @@ function upcomingRunsForJob(job: CronJob, startAtMs: number, endAtMs: number): {
   }
 }
 
+function buildAgendaItems(jobs: CronJob[], startAtMs: number, endAtMs: number): AgendaItem[] {
+  const items: AgendaItem[] = [];
+
+  for (const job of jobs) {
+    const expr = getCronExpr(job.schedule);
+    const tz = getCronTz(job.schedule);
+    if (!expr) continue;
+
+    const { runs, wasCapped } = upcomingRunsForJob(job, startAtMs, endAtMs);
+
+    for (const runAtMs of runs) {
+      const agentId = job.agentId || '(default)';
+      const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+
+      items.push({
+        runAtMs,
+        job,
+        agentId,
+        enabled: Boolean(job.enabled),
+        status,
+        scheduleExpr: expr,
+        scheduleTz: tz,
+        wasCapped,
+      });
+    }
+  }
+
+  items.sort((a, b) => {
+    if (a.runAtMs !== b.runAtMs) return a.runAtMs - b.runAtMs;
+    return String(a.job.name || '').localeCompare(String(b.job.name || ''));
+  });
+
+  return items;
+}
+
+function groupAgendaByDay(items: AgendaItem[], timeZone?: string): AgendaGroup[] {
+  const groups = new Map<string, { headingMs: number; items: AgendaItem[] }>();
+
+  for (const item of items) {
+    const key = dateKey(item.runAtMs, timeZone);
+    const existing = groups.get(key);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groups.set(key, { headingMs: item.runAtMs, items: [item] });
+    }
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, value]) => ({ key, heading: formatDayHeading(value.headingMs), items: value.items }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+}
+
 export default function App() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [modelByAgentId, setModelByAgentId] = useState<Record<string, string>>({});
@@ -304,7 +375,9 @@ export default function App() {
             ? String(agentsPayload.defaults.model.primary ?? '')
             : isRecord(agentsPayload) && isRecord(agentsPayload.defaults) && typeof agentsPayload.defaults.model === 'string'
               ? agentsPayload.defaults.model
-              : isRecord(agentsPayload) && isRecord(agentsPayload.agentDefaults) && typeof agentsPayload.agentDefaults.model === 'string'
+              : isRecord(agentsPayload) &&
+                  isRecord(agentsPayload.agentDefaults) &&
+                  typeof agentsPayload.agentDefaults.model === 'string'
                 ? agentsPayload.agentDefaults.model
                 : '';
 
@@ -338,56 +411,71 @@ export default function App() {
     });
   }, [enabledOnly, jobs, query]);
 
-  const agendaByDay = useMemo(() => {
-    const startAtMs = Date.now();
+  const agenda = useMemo(() => {
+    const nowMs = Date.now();
+    const startAtMs = nowMs;
     const endAtMs = startAtMs + AGENDA_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000;
 
-    const items: AgendaItem[] = [];
+    const allItems = buildAgendaItems(filteredJobs, startAtMs, endAtMs);
+    const total = allItems.length;
+    const shown = Math.min(total, MAX_AGENDA_ITEMS_TOTAL);
+    const wasGlobalCapped = total > shown;
+    const items = allItems.slice(0, shown);
 
-    for (const job of filteredJobs) {
-      const expr = getCronExpr(job.schedule);
-      const tz = getCronTz(job.schedule);
-      if (!expr) continue;
+    return {
+      total,
+      shown,
+      wasGlobalCapped,
+      groups: groupAgendaByDay(items),
+    };
+  }, [filteredJobs]);
 
-      const { runs, wasCapped } = upcomingRunsForJob(job, startAtMs, endAtMs);
+  const week = useMemo(() => {
+    const nowMs = Date.now();
+    const weekStartMs = startOfWeekMs(nowMs, WEEK_STARTS_ON);
+    const weekEndMs = weekStartMs + 7 * 24 * 60 * 60 * 1000;
 
-      for (const runAtMs of runs) {
-        const agentId = job.agentId || '(default)';
-        const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+    const allItems = buildAgendaItems(filteredJobs, weekStartMs, weekEndMs).filter((item) => item.runAtMs >= nowMs);
 
-        items.push({
-          runAtMs,
-          job,
-          agentId,
-          enabled: Boolean(job.enabled),
-          status,
-          scheduleExpr: expr,
-          scheduleTz: tz,
-          wasCapped,
-        });
-      }
-    }
+    const total = allItems.length;
+    const shown = Math.min(total, MAX_AGENDA_ITEMS_TOTAL);
+    const wasGlobalCapped = total > shown;
+    const items = allItems.slice(0, shown);
 
-    items.sort((a, b) => {
-      if (a.runAtMs !== b.runAtMs) return a.runAtMs - b.runAtMs;
-      return String(a.job.name || '').localeCompare(String(b.job.name || ''));
-    });
-
-    const groups = new Map<string, { headingMs: number; items: AgendaItem[] }>();
-
+    const byDay = new Map<string, AgendaItem[]>();
     for (const item of items) {
       const key = dateKey(item.runAtMs);
-      const existing = groups.get(key);
-      if (existing) {
-        existing.items.push(item);
-      } else {
-        groups.set(key, { headingMs: item.runAtMs, items: [item] });
-      }
+      const list = byDay.get(key);
+      if (list) list.push(item);
+      else byDay.set(key, [item]);
     }
 
-    return Array.from(groups.entries())
-      .map(([key, value]) => ({ key, heading: formatDayHeading(value.headingMs), items: value.items }))
-      .sort((a, b) => a.key.localeCompare(b.key));
+    const days = Array.from({ length: 7 }, (_, idx) => {
+      const dayStartMs = weekStartMs + idx * 24 * 60 * 60 * 1000;
+      const key = dateKey(dayStartMs);
+      const heading = formatDayHeading(dayStartMs);
+      const list = byDay.get(key) ?? [];
+      list.sort((a, b) => a.runAtMs - b.runAtMs);
+      return { key, heading, items: list };
+    });
+
+    const label = new Date(weekStartMs).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
+
+    const endLabel = new Date(weekStartMs + 6 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
+
+    return {
+      total,
+      shown,
+      wasGlobalCapped,
+      days,
+      label: `${label}–${endLabel}`,
+    };
   }, [filteredJobs]);
 
   return (
@@ -430,6 +518,13 @@ export default function App() {
                 onClick={() => setCronView('table')}
               >
                 Table
+              </button>
+              <button
+                type="button"
+                className={cronView === 'week' ? 'seg active' : 'seg'}
+                onClick={() => setCronView('week')}
+              >
+                Week
               </button>
               <button
                 type="button"
@@ -511,16 +606,25 @@ export default function App() {
                 )}
               </tbody>
             </table>
-          ) : (
+          ) : null}
+
+          {cronView === 'agenda' ? (
             <div className="agenda">
               <div className="agenda-meta small">
-                Upcoming runs for the next {AGENDA_LOOKAHEAD_DAYS} days. Noisy schedules are capped to one run/day.
+                Upcoming run <b>instances</b> for the next {AGENDA_LOOKAHEAD_DAYS} days (a single job can appear multiple
+                times). Noisy schedules are capped to one run/day.
+                {agenda.wasGlobalCapped ? (
+                  <span>
+                    {' '}
+                    Showing {agenda.shown} of {agenda.total} total instances.
+                  </span>
+                ) : null}
               </div>
 
-              {agendaByDay.length === 0 ? (
+              {agenda.groups.length === 0 ? (
                 <div className="small">No upcoming runs found (or no cron expressions in current filter).</div>
               ) : (
-                agendaByDay.map((group) => (
+                agenda.groups.map((group) => (
                   <div key={group.key} className="agenda-day">
                     <h3 className="agenda-heading">{group.heading}</h3>
                     <div className="agenda-list">
@@ -560,7 +664,61 @@ export default function App() {
                 ))
               )}
             </div>
-          )}
+          ) : null}
+
+          {cronView === 'week' ? (
+            <div className="week">
+              <div className="agenda-meta small">
+                Week view ({week.label}). Upcoming run <b>instances</b> only. Noisy schedules are capped to one run/day.
+                {week.wasGlobalCapped ? (
+                  <span>
+                    {' '}
+                    Showing {week.shown} of {week.total} total instances.
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="week-grid" role="grid" aria-label="Weekly cron calendar">
+                {week.days.map((day) => (
+                  <div key={day.key} className="week-day" role="gridcell">
+                    <div className="week-day-header">
+                      <div className="week-day-title">{day.heading}</div>
+                      <div className="week-day-count small mono">{day.items.length}</div>
+                    </div>
+
+                    {day.items.length === 0 ? (
+                      <div className="small">—</div>
+                    ) : (
+                      <div className="week-day-list">
+                        {day.items.map((item) => {
+                          const jobTz = item.scheduleTz;
+                          return (
+                            <div key={`${item.job.id || item.job.name}-${item.runAtMs}`} className="week-item">
+                              <div className="week-item-top">
+                                <div className="mono week-item-time">{formatTime(item.runAtMs)}</div>
+                                {item.wasCapped ? <span className="badge idle">capped</span> : null}
+                              </div>
+                              <div className="week-item-title">
+                                <b>{item.job.name || '—'}</b>
+                              </div>
+                              <div className="week-item-meta small mono">
+                                {item.agentId} · {item.enabled ? 'enabled' : 'disabled'} · {item.status}
+                              </div>
+                              {jobTz ? (
+                                <div className="week-item-meta small mono">
+                                  {formatTime(item.runAtMs, jobTz)} ({jobTz})
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
       </main>
     </>
