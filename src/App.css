@@ -272,6 +272,13 @@ code {
   gap: 8px;
 }
 
+.week-item-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .week-item-title {
   font-size: 13px;
   line-height: 1.2;

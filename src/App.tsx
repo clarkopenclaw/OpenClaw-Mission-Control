@@ -696,14 +696,16 @@ export default function App() {
                             <div key={`${item.job.id || item.job.name}-${item.runAtMs}`} className="week-item">
                               <div className="week-item-top">
                                 <div className="mono week-item-time">{formatTime(item.runAtMs)}</div>
-                                {item.wasCapped ? <span className="badge idle">capped</span> : null}
+                                <div className="week-item-badges">
+                                  <span className="badge">{item.enabled ? 'enabled' : 'disabled'}</span>
+                                  <span className={badgeClass(item.status)}>{item.status}</span>
+                                  {item.wasCapped ? <span className="badge idle">capped</span> : null}
+                                </div>
                               </div>
                               <div className="week-item-title">
                                 <b>{item.job.name || '—'}</b>
                               </div>
-                              <div className="week-item-meta small mono">
-                                {item.agentId} · {item.enabled ? 'enabled' : 'disabled'} · {item.status}
-                              </div>
+                              <div className="week-item-meta small mono">{item.agentId}</div>
                               {jobTz ? (
                                 <div className="week-item-meta small mono">
                                   {formatTime(item.runAtMs, jobTz)} ({jobTz})
