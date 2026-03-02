@@ -57,7 +57,6 @@ const MAX_RUNS_PER_JOB = 20;
 const MAX_RUNS_PER_NOISY_JOB = 7;
 const MAX_ITERATIONS_PER_JOB = 500;
 const MAX_AGENDA_ITEMS_TOTAL = 250;
-const WEEK_STARTS_ON: 0 | 1 = 1; // 0 = Sunday, 1 = Monday
 
 function isRecord(value: unknown): value is AnyRecord {
   return Boolean(value) && typeof value === 'object';
@@ -201,13 +200,9 @@ function getCronTz(schedule?: CronJob['schedule']): string {
   return schedule.tz || schedule.timezone || '';
 }
 
-function startOfWeekMs(epochMs: number, weekStartsOn: 0 | 1): number {
+function startOfDayMs(epochMs: number): number {
   const d = new Date(epochMs);
   d.setHours(0, 0, 0, 0);
-
-  const day = d.getDay();
-  const diff = (day - weekStartsOn + 7) % 7;
-  d.setDate(d.getDate() - diff);
   return d.getTime();
 }
 
@@ -432,10 +427,10 @@ export default function App() {
 
   const week = useMemo(() => {
     const nowMs = Date.now();
-    const weekStartMs = startOfWeekMs(nowMs, WEEK_STARTS_ON);
-    const weekEndMs = weekStartMs + 7 * 24 * 60 * 60 * 1000;
+    const rangeStartMs = nowMs;
+    const rangeEndMs = rangeStartMs + 7 * 24 * 60 * 60 * 1000;
 
-    const allItems = buildAgendaItems(filteredJobs, weekStartMs, weekEndMs).filter((item) => item.runAtMs >= nowMs);
+    const allItems = buildAgendaItems(filteredJobs, rangeStartMs, rangeEndMs);
 
     const total = allItems.length;
     const shown = Math.min(total, MAX_AGENDA_ITEMS_TOTAL);
@@ -450,8 +445,10 @@ export default function App() {
       else byDay.set(key, [item]);
     }
 
+    const day0Ms = startOfDayMs(nowMs);
+
     const days = Array.from({ length: 7 }, (_, idx) => {
-      const dayStartMs = weekStartMs + idx * 24 * 60 * 60 * 1000;
+      const dayStartMs = day0Ms + idx * 24 * 60 * 60 * 1000;
       const key = dateKey(dayStartMs);
       const heading = formatDayHeading(dayStartMs);
       const list = byDay.get(key) ?? [];
@@ -459,12 +456,12 @@ export default function App() {
       return { key, heading, items: list };
     });
 
-    const label = new Date(weekStartMs).toLocaleDateString(undefined, {
+    const label = new Date(day0Ms).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
     });
 
-    const endLabel = new Date(weekStartMs + 6 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
+    const endLabel = new Date(day0Ms + 6 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
     });
@@ -669,7 +666,7 @@ export default function App() {
           {cronView === 'week' ? (
             <div className="week">
               <div className="agenda-meta small">
-                Calendar view ({week.label}). Upcoming run <b>instances</b> only. Noisy schedules are capped to one run/day.
+                Calendar view ({week.label}). Upcoming run <b>instances</b> (next 7 days). Noisy schedules are capped to one run/day.
                 {week.wasGlobalCapped ? (
                   <span>
                     {' '}
