@@ -292,6 +292,136 @@ code {
   color: #666;
 }
 
+.week-timegrid {
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  overflow: auto;
+  background: #fff;
+  max-height: 70vh;
+}
+
+.week-timegrid-header {
+  display: grid;
+  grid-template-columns: 90px repeat(7, minmax(180px, 1fr));
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  border-bottom: 1px solid #eef0f6;
+}
+
+.week-timegrid-head {
+  padding: 8px 10px;
+}
+
+.week-timegrid-head-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.week-timegrid-head-day {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  border-left: 1px solid #f0f2f7;
+}
+
+.week-timegrid-day-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.week-timegrid-body {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  min-width: 980px;
+}
+
+.week-timegrid-timecol {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  border-right: 1px solid #eef0f6;
+}
+
+.week-timegrid-timecell {
+  height: 28px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #f3f5fa;
+  font-size: 11px;
+  color: #666;
+  display: flex;
+  align-items: flex-start;
+}
+
+.week-timegrid-timecell-label {
+  line-height: 1;
+}
+
+.week-timegrid-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(180px, 1fr));
+}
+
+.week-timegrid-daycol {
+  border-left: 1px solid #f0f2f7;
+}
+
+.week-timegrid-slot {
+  height: 28px;
+  border-bottom: 1px solid #f3f5fa;
+  padding: 2px 4px;
+  overflow: hidden;
+}
+
+.week-timegrid-slot.alt {
+  background: #fafbff;
+}
+
+.week-timegrid-slot-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.run-chip {
+  --chip-color: #888;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid #e6e8ef;
+  border-left: 4px solid var(--chip-color);
+  border-radius: 999px;
+  padding: 2px 8px 2px 6px;
+  background: #fff;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.run-chip-time {
+  color: #222;
+}
+
+.run-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.run-chip.more {
+  border-left-color: #ddd;
+  background: #f7f7f7;
+  color: #555;
+}
+
 .agenda-title {
   display: flex;
   flex-wrap: wrap;

@@ -152,6 +152,150 @@ function badgeClass(value: string): string {
   return 'badge';
 }
 
+const CALENDAR_SLOT_MINUTES = 30;
+const CALENDAR_MAX_CHIPS_PER_SLOT = 3;
+
+function minuteOfLocalDay(epochMs: number): number {
+  const d = new Date(epochMs);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function hash32(text: string): number {
+  let h = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    h = (h << 5) - h + text.charCodeAt(i);
+    h |= 0;
+  }
+  return h;
+}
+
+function colorForKey(key: string): string {
+  const hue = Math.abs(hash32(key)) % 360;
+  return `hsl(${hue} 70% 42%)`;
+}
+
+function slotLabel(slotIndex: number): string {
+  const totalMinutes = slotIndex * CALENDAR_SLOT_MINUTES;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const d = new Date();
+  d.setHours(hours, minutes, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function slotLabelMaybe(slotIndex: number): string {
+  const slotsPerHour = Math.floor(60 / CALENDAR_SLOT_MINUTES);
+  return slotIndex % slotsPerHour === 0 ? slotLabel(slotIndex) : '';
+}
+
+function formatLocalTimeOfDay(epochMs: number): string {
+  return new Date(epochMs).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatJobTooltip(item: AgendaItem): string {
+  const when = formatLocalTimeOfDay(item.runAtMs);
+  const name = item.job.name || '—';
+  const cronLine = `cron ${item.scheduleExpr}${item.scheduleTz ? ` @ ${item.scheduleTz}` : ''}`;
+  const statusLine = `Status: ${item.status}`;
+  const agentLine = `Agent: ${item.agentId}`;
+  return [`${when} — ${name}`, statusLine, agentLine, cronLine].join('\n');
+}
+
+function buildDaySlots(items: AgendaItem[]): AgendaItem[][] {
+  const slotCount = Math.ceil((24 * 60) / CALENDAR_SLOT_MINUTES);
+  const slots: AgendaItem[][] = Array.from({ length: slotCount }, () => []);
+
+  for (const item of items) {
+    const minute = minuteOfLocalDay(item.runAtMs);
+    const slotIdx = Math.max(0, Math.min(slotCount - 1, Math.floor(minute / CALENDAR_SLOT_MINUTES)));
+    slots[slotIdx].push(item);
+  }
+
+  for (const slot of slots) {
+    slot.sort((a, b) => a.runAtMs - b.runAtMs);
+  }
+
+  return slots;
+}
+
+function WeekTimeGrid({
+  days,
+}: {
+  days: { key: string; heading: string; items: AgendaItem[] }[];
+}) {
+  const slotCount = Math.ceil((24 * 60) / CALENDAR_SLOT_MINUTES);
+
+  return (
+    <div className="week-timegrid" role="grid" aria-label="Cron calendar (aligned by time-of-day)">
+      <div className="week-timegrid-header" role="row">
+        <div className="week-timegrid-head week-timegrid-head-time" role="columnheader">
+          Time
+        </div>
+        {days.map((day) => (
+          <div key={day.key} className="week-timegrid-head week-timegrid-head-day" role="columnheader">
+            <div className="week-timegrid-day-title">{day.heading}</div>
+            <div className="week-timegrid-day-count small mono">{day.items.length}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="week-timegrid-body" role="rowgroup">
+        <div className="week-timegrid-timecol" aria-hidden="true">
+          {Array.from({ length: slotCount }, (_, slotIdx) => (
+            <div key={slotIdx} className="week-timegrid-timecell">
+              <span className="week-timegrid-timecell-label">{slotLabelMaybe(slotIdx)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="week-timegrid-days">
+          {days.map((day) => {
+            const slots = buildDaySlots(day.items);
+
+            return (
+              <div key={day.key} className="week-timegrid-daycol" role="rowgroup" aria-label={day.heading}>
+                {slots.map((slotItems, slotIdx) => {
+                  const shown = slotItems.slice(0, CALENDAR_MAX_CHIPS_PER_SLOT);
+                  const extra = Math.max(0, slotItems.length - shown.length);
+
+                  return (
+                    <div
+                      key={slotIdx}
+                      className={slotIdx % 2 === 0 ? 'week-timegrid-slot' : 'week-timegrid-slot alt'}
+                      role="row"
+                    >
+                      <div className="week-timegrid-slot-inner">
+                        {shown.map((item) => {
+                          const key = String(item.job.id || item.job.name || item.agentId || 'job');
+                          const color = colorForKey(key);
+
+                          return (
+                            <span
+                              key={`${item.job.id || item.job.name}-${item.runAtMs}`}
+                              className="run-chip"
+                              style={{ '--chip-color': color } as React.CSSProperties}
+                              title={formatJobTooltip(item)}
+                            >
+                              <span className="run-chip-time mono">{formatLocalTimeOfDay(item.runAtMs)}</span>
+                              <span className="run-chip-name">{item.job.name || '—'}</span>
+                              <span className={badgeClass(item.status)}>{item.status}</span>
+                            </span>
+                          );
+                        })}
+                        {extra ? <span className="run-chip more">+{extra}</span> : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatTime(epochMs: number, timeZone?: string): string {
   const options: Intl.DateTimeFormatOptions = {
     hour: '2-digit',
@@ -675,47 +819,7 @@ export default function App() {
                 ) : null}
               </div>
 
-              <div className="week-grid" role="grid" aria-label="Cron calendar">
-                {week.days.map((day) => (
-                  <div key={day.key} className="week-day" role="gridcell">
-                    <div className="week-day-header">
-                      <div className="week-day-title">{day.heading}</div>
-                      <div className="week-day-count small mono">{day.items.length}</div>
-                    </div>
-
-                    {day.items.length === 0 ? (
-                      <div className="small">—</div>
-                    ) : (
-                      <div className="week-day-list">
-                        {day.items.map((item) => {
-                          const jobTz = item.scheduleTz;
-                          return (
-                            <div key={`${item.job.id || item.job.name}-${item.runAtMs}`} className="week-item">
-                              <div className="week-item-top">
-                                <div className="mono week-item-time">{formatTime(item.runAtMs)}</div>
-                                <div className="week-item-badges">
-                                  <span className="badge">{item.enabled ? 'enabled' : 'disabled'}</span>
-                                  <span className={badgeClass(item.status)}>{item.status}</span>
-                                  {item.wasCapped ? <span className="badge idle">capped</span> : null}
-                                </div>
-                              </div>
-                              <div className="week-item-title">
-                                <b>{item.job.name || '—'}</b>
-                              </div>
-                              <div className="week-item-meta small mono">{item.agentId}</div>
-                              {jobTz ? (
-                                <div className="week-item-meta small mono">
-                                  {formatTime(item.runAtMs, jobTz)} ({jobTz})
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <WeekTimeGrid days={week.days} />
             </div>
           ) : null}
         </section>
