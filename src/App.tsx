@@ -57,6 +57,7 @@ const MAX_RUNS_PER_JOB = 20;
 const MAX_RUNS_PER_NOISY_JOB = 7;
 const MAX_ITERATIONS_PER_JOB = 500;
 const MAX_AGENDA_ITEMS_TOTAL = 250;
+const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
 
 function isRecord(value: unknown): value is AnyRecord {
   return Boolean(value) && typeof value === 'object';
@@ -121,11 +122,14 @@ function formatSchedule(schedule: CronJob['schedule']): string {
   if (!schedule) {
     return '—';
   }
-  if (schedule.kind === 'cron') {
-    const expr = schedule.expr || schedule.cron || '';
-    const tz = schedule.tz || schedule.timezone || '';
+
+  const expr = schedule.expr || schedule.cron || '';
+  const tz = schedule.tz || schedule.timezone || '';
+
+  if (expr) {
     return `cron ${expr}${tz ? ` @ ${tz}` : ''}`.trim();
   }
+
   return schedule.kind || '—';
 }
 
@@ -331,14 +335,14 @@ function dateKey(epochMs: number, timeZone?: string): string {
 }
 
 function getCronExpr(schedule?: CronJob['schedule']): string {
-  if (!schedule || schedule.kind !== 'cron') {
+  if (!schedule) {
     return '';
   }
   return schedule.expr || schedule.cron || '';
 }
 
 function getCronTz(schedule?: CronJob['schedule']): string {
-  if (!schedule || schedule.kind !== 'cron') {
+  if (!schedule) {
     return '';
   }
   return schedule.tz || schedule.timezone || '';
@@ -771,17 +775,13 @@ export default function App() {
                     <div className="agenda-list">
                       {group.items.map((item) => {
                         const model = modelByAgentId[item.agentId] || modelByAgentId['(default)'] || '—';
-                        const jobTz = item.scheduleTz;
+                        const jobTz = item.scheduleTz || LOCAL_TIME_ZONE;
 
                         return (
                           <div key={`${item.job.id || item.job.name}-${item.runAtMs}`} className="agenda-item">
                             <div className="agenda-time">
-                              <div className="mono">{formatTime(item.runAtMs)}</div>
-                              {jobTz ? (
-                                <div className="small mono">
-                                  {formatTime(item.runAtMs, jobTz)} ({jobTz})
-                                </div>
-                              ) : null}
+                              <div className="mono">Local: {formatTime(item.runAtMs)} ({LOCAL_TIME_ZONE})</div>
+                              <div className="small mono">Job: {formatTime(item.runAtMs, jobTz)} ({jobTz})</div>
                             </div>
 
                             <div className="agenda-body">
