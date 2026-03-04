@@ -197,12 +197,16 @@ function formatLocalTimeOfDay(epochMs: number): string {
 }
 
 function formatJobTooltip(item: AgendaItem): string {
-  const when = formatLocalTimeOfDay(item.runAtMs);
+  const whenLocal = formatTime(item.runAtMs);
   const name = item.job.name || '—';
+  const jobTz = item.scheduleTz || LOCAL_TIME_ZONE;
   const cronLine = `cron ${item.scheduleExpr}${item.scheduleTz ? ` @ ${item.scheduleTz}` : ''}`;
   const statusLine = `Status: ${item.status}`;
+  const enabledLine = `Enabled: ${item.enabled ? 'yes' : 'no'}`;
   const agentLine = `Agent: ${item.agentId}`;
-  return [`${when} — ${name}`, statusLine, agentLine, cronLine].join('\n');
+  const jobLine = `Job time: ${formatTime(item.runAtMs, jobTz)} (${jobTz})`;
+
+  return [`${whenLocal} — ${name}`, jobLine, statusLine, enabledLine, agentLine, cronLine].join('\n');
 }
 
 function buildDaySlots(items: AgendaItem[]): AgendaItem[][] {
@@ -307,11 +311,21 @@ function formatTime(epochMs: number, timeZone?: string): string {
     timeZoneName: 'short',
   };
 
-  if (timeZone) {
-    options.timeZone = timeZone;
+  const normalized = timeZone && timeZone.toLowerCase() !== 'local' ? timeZone : undefined;
+  if (normalized) {
+    options.timeZone = normalized;
   }
 
-  return new Date(epochMs).toLocaleTimeString(undefined, options);
+  try {
+    return new Date(epochMs).toLocaleTimeString(undefined, options);
+  } catch {
+    // If we get an invalid timezone (or a host that doesn't support the IANA name), fall back to local.
+    return new Date(epochMs).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    });
+  }
 }
 
 function formatDayHeading(epochMs: number): string {
