@@ -196,6 +196,18 @@ function formatLocalTimeOfDay(epochMs: number): string {
   return new Date(epochMs).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+function shortenMiddle(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const keep = Math.max(2, Math.floor((maxLen - 1) / 2));
+  return `${text.slice(0, keep)}…${text.slice(text.length - keep)}`;
+}
+
+function formatAgentId(agentId: string): string {
+  // Commonly looks like "openclaw/agent-name" or "agent-name".
+  const cleaned = agentId.replace(/^openclaw\//, '');
+  return shortenMiddle(cleaned, 18);
+}
+
 function formatJobTooltip(item: AgendaItem): string {
   const whenLocal = formatTime(item.runAtMs);
   const name = item.job.name || '—';
@@ -280,12 +292,14 @@ function WeekTimeGrid({
                           return (
                             <span
                               key={`${item.job.id || item.job.name}-${item.runAtMs}`}
-                              className="run-chip"
+                              className={item.enabled ? 'run-chip' : 'run-chip disabled'}
                               style={{ '--chip-color': color } as React.CSSProperties}
                               title={formatJobTooltip(item)}
                             >
                               <span className="run-chip-time mono">{formatLocalTimeOfDay(item.runAtMs)}</span>
                               <span className="run-chip-name">{item.job.name || '—'}</span>
+                              <span className="run-chip-agent mono">{formatAgentId(item.agentId)}</span>
+                              {!item.enabled ? <span className="badge idle">off</span> : null}
                               <span className={badgeClass(item.status)}>{item.status}</span>
                             </span>
                           );

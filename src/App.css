@@ -416,6 +416,16 @@ code {
   text-overflow: ellipsis;
 }
 
+.run-chip-agent {
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.run-chip.disabled {
+  opacity: 0.55;
+}
+
 .run-chip.more {
   border-left-color: #ddd;
   background: #f7f7f7;
