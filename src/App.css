@@ -180,6 +180,11 @@ code {
   background: #fff0f0;
 }
 
+.badge.warn {
+  border-color: #f0d18b;
+  background: #fff7df;
+}
+
 .badge.idle {
   border-color: #ddd;
   background: #f7f7f7;
@@ -188,6 +193,67 @@ code {
 .agenda {
   display: grid;
   gap: 14px;
+}
+
+.needs-attention-card {
+  display: grid;
+  gap: 12px;
+}
+
+.needs-attention-list {
+  display: grid;
+  gap: 10px;
+}
+
+.needs-attention-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  background: #fafbff;
+}
+
+.needs-attention-main,
+.needs-attention-reasons {
+  display: grid;
+  gap: 8px;
+}
+
+.needs-attention-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.needs-attention-title {
+  font-size: 15px;
+}
+
+.needs-attention-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.needs-attention-reason {
+  display: grid;
+  gap: 4px;
+}
+
+.needs-attention-actions {
+  display: flex;
+  align-items: flex-start;
+}
+
+.needs-attention-empty {
+  border: 1px dashed #d7dbe8;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafbff;
 }
 
 .agenda-meta {
@@ -471,5 +537,17 @@ code {
 
   .agenda-item {
     grid-template-columns: 1fr;
+  }
+
+  .needs-attention-item {
+    grid-template-columns: 1fr;
+  }
+
+  .needs-attention-title-row {
+    flex-direction: column;
+  }
+
+  .needs-attention-badges {
+    justify-content: flex-start;
   }
 }

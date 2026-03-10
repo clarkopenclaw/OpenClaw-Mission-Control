@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import {
+  attentionLevelClass,
+  getNeedsAttentionItems,
+  summarizeNeedsAttention,
+} from './needsAttention';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -22,6 +27,12 @@ type CronJob = {
     lastRunAtMs?: number;
     lastRunStatus?: string;
     lastStatus?: string;
+    consecutiveErrors?: number;
+    lastDelivered?: boolean | string;
+    lastDeliveryStatus?: string;
+    lastDeliveryError?: string;
+    lastError?: string;
+    runningAtMs?: number;
   };
 };
 
@@ -152,6 +163,7 @@ function badgeClass(value: string): string {
   const text = value.toLowerCase();
   if (text.includes('ok')) return 'badge ok';
   if (text.includes('err') || text.includes('fail')) return 'badge err';
+  if (text.includes('warn') || text.includes('attention')) return 'badge warn';
   if (text.includes('idle')) return 'badge idle';
   return 'badge';
 }
@@ -651,6 +663,15 @@ export default function App() {
     };
   }, [filteredJobs]);
 
+  const needsAttentionItems = useMemo(() => getNeedsAttentionItems(jobs), [jobs]);
+  const needsAttentionSummary = useMemo(() => summarizeNeedsAttention(needsAttentionItems), [needsAttentionItems]);
+
+  const focusJob = (name: string) => {
+    setQuery(name);
+    setEnabledOnly(false);
+    setCronView('table');
+  };
+
   return (
     <>
       <header className="header">
@@ -672,6 +693,72 @@ export default function App() {
       </header>
 
       <main className="container">
+        <section className="card needs-attention-card">
+          <div className="card-title">
+            <div>
+              <h2>Needs attention</h2>
+              <div className="hint">{needsAttentionSummary}</div>
+            </div>
+            {needsAttentionItems.length > 0 ? <span className="badge err">Now</span> : <span className="badge ok">Clear</span>}
+          </div>
+
+          {needsAttentionItems.length === 0 ? (
+            <div className="needs-attention-empty">
+              <div className="small">Nothing urgent is surfaced from current cron-job data.</div>
+            </div>
+          ) : (
+            <div className="needs-attention-list">
+              {needsAttentionItems.map((item) => (
+                <article key={item.key} className="needs-attention-item">
+                  <div className="needs-attention-main">
+                    <div className="needs-attention-title-row">
+                      <div>
+                        <div className="needs-attention-title">
+                          <b>{item.name}</b>
+                        </div>
+                        <div className="small mono">Agent: {item.agentId}</div>
+                      </div>
+                      <div className="needs-attention-badges">
+                        <span className={item.enabled ? 'badge' : 'badge idle'}>{item.enabled ? 'enabled' : 'disabled'}</span>
+                        {item.reasons.map((reason) => (
+                          <span
+                            key={`${item.key}-${reason.kind}`}
+                            className={`badge ${attentionLevelClass(reason.level)}`}
+                          >
+                            {reason.headline}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="needs-attention-reasons">
+                      {item.reasons.map((reason) => {
+                        const timestamp = reason.kind === 'running' ? item.runningAtMs : item.lastRunAtMs;
+
+                        return (
+                          <div key={`${item.key}-${reason.kind}-detail`} className="needs-attention-reason">
+                            <div>
+                              <span className={`badge ${attentionLevelClass(reason.level)}`}>{reason.kind}</span>{' '}
+                              <span>{reason.detail}</span>
+                            </div>
+                            {timestamp ? <div className="small mono">When: {formatDateFromMs(timestamp)}</div> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="needs-attention-actions">
+                    <button type="button" onClick={() => focusJob(item.name)}>
+                      Focus in table
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="card">
           <h2>Data</h2>
           <div className="mono">Generated: {generatedAt}</div>
