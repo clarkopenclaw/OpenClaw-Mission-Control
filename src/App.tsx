@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import SessionHealth from './SessionHealth';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -680,6 +681,8 @@ export default function App() {
           </div>
           {refreshHint ? <div className="hint">{refreshHint}</div> : null}
         </section>
+
+        <SessionHealth />
 
         <section className="card">
           <div className="card-title">

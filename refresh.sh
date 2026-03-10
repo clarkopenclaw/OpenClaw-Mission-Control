@@ -23,3 +23,8 @@ echo "Wrote: $DATA_DIR/cron-jobs.json"
 echo "Wrote: $DATA_DIR/agents.json"
 echo "Wrote: $DATA_DIR/cron-runs-help.txt" 
 echo "Wrote: $DATA_DIR/meta.json"
+
+# Sessions (for agent session health panel)
+openclaw status --json > "$DATA_DIR/openclaw-status.json"
+
+echo "Wrote: $DATA_DIR/openclaw-status.json"
