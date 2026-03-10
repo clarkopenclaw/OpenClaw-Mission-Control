@@ -11,6 +11,9 @@ openclaw cron list --all --json > "$DATA_DIR/cron-jobs.json"
 # Agents (for model mapping)
 openclaw agents list --json > "$DATA_DIR/agents.json"
 
+# Agent status (best-effort — don't fail if unavailable)
+openclaw status --json > "$DATA_DIR/status.json" 2>/dev/null || true
+
 # Recent runs
 # Note: `openclaw cron runs` may require a specific job id depending on OpenClaw version.
 # We keep this best-effort and don't fail refresh if unsupported.
@@ -19,6 +22,7 @@ openclaw cron runs --help > "$DATA_DIR/cron-runs-help.txt" 2>&1 || true
 # Timestamp
 node -e 'process.stdout.write(JSON.stringify({ generatedAt: Math.floor(Date.now() / 1000) }, null, 2) + "\n")' > "$DATA_DIR/meta.json"
 
+echo "Wrote: $DATA_DIR/status.json (best-effort)"
 echo "Wrote: $DATA_DIR/cron-jobs.json"
 echo "Wrote: $DATA_DIR/agents.json"
 echo "Wrote: $DATA_DIR/cron-runs-help.txt" 

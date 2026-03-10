@@ -454,6 +454,29 @@ code {
   font-size: 12px;
 }
 
+.status-totals {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.status-subsection-title {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  color: #333;
+}
+
+.status-agents-table,
+.status-sessions-table {
+  font-size: 12px;
+}
+
+.status-sessions-table td:first-child {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 960px) {
   .header {
     align-items: flex-start;

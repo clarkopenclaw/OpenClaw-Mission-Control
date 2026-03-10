@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import {
+  parseStatusPayload,
+  deriveAgentSummaries,
+  deriveHotSessions,
+  deriveTotals,
+  formatAgeMs,
+  type StatusPayload,
+  type AgentSummary,
+  type HotSession,
+} from './statusHelpers';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -511,15 +521,17 @@ export default function App() {
   const [enabledOnly, setEnabledOnly] = useState<boolean>(false);
   const [refreshHint, setRefreshHint] = useState<string>('');
   const [cronView, setCronView] = useState<CronView>('table');
+  const [statusData, setStatusData] = useState<StatusPayload | null>(null);
 
   useEffect(() => {
     void (async () => {
       setError('');
 
-      const [metaResult, agentsResult, jobsResult] = await Promise.allSettled([
+      const [metaResult, agentsResult, jobsResult, statusResult] = await Promise.allSettled([
         loadJson('/data/meta.json'),
         loadJson('/data/agents.json'),
         loadJson('/data/cron-jobs.json'),
+        loadJson('/data/status.json'),
       ]);
 
       if (metaResult.status === 'fulfilled') {
@@ -567,8 +579,29 @@ export default function App() {
         setJobs([]);
         setError(jobsResult.reason instanceof Error ? jobsResult.reason.message : 'Failed to load /data/cron-jobs.json');
       }
+
+      if (statusResult.status === 'fulfilled') {
+        setStatusData(parseStatusPayload(statusResult.value));
+      } else {
+        setStatusData(null);
+      }
     })();
   }, []);
+
+  const agentSummaries: AgentSummary[] = useMemo(
+    () => (statusData ? deriveAgentSummaries(statusData) : []),
+    [statusData],
+  );
+
+  const hotSessions: HotSession[] = useMemo(
+    () => (statusData ? deriveHotSessions(statusData, 5) : []),
+    [statusData],
+  );
+
+  const statusTotals = useMemo(
+    () => (statusData ? deriveTotals(statusData) : null),
+    [statusData],
+  );
 
   const filteredJobs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -679,6 +712,91 @@ export default function App() {
             Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>.
           </div>
           {refreshHint ? <div className="hint">{refreshHint}</div> : null}
+        </section>
+
+        <section className="card">
+          <h2>Agent Activity</h2>
+          {!statusData ? (
+            <div className="small">
+              No agent status data. Run <code>./refresh.sh</code> to generate <code>/data/status.json</code>.
+            </div>
+          ) : (
+            <>
+              {statusTotals ? (
+                <div className="status-totals mono">
+                  {statusTotals.totalSessions} total sessions
+                  {statusTotals.bootstrapPendingCount > 0
+                    ? ` · ${statusTotals.bootstrapPendingCount} bootstrap pending`
+                    : null}
+                </div>
+              ) : null}
+
+              <table className="table status-agents-table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Sessions</th>
+                    <th>Last active</th>
+                    <th>Heartbeat</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentSummaries.map((agent) => (
+                    <tr key={agent.id}>
+                      <td className="mono">{agent.name}</td>
+                      <td className="mono">{agent.sessionsCount}</td>
+                      <td className="mono">{formatAgeMs(agent.lastActiveAgeMs)}</td>
+                      <td className="mono">
+                        {agent.heartbeatEnabled ? (
+                          <span className="badge ok">every {agent.heartbeatEvery}</span>
+                        ) : (
+                          <span className="badge idle">disabled</span>
+                        )}
+                      </td>
+                      <td>
+                        {agent.bootstrapPending ? (
+                          <span className="badge err">bootstrap pending</span>
+                        ) : (
+                          <span className="badge ok">ok</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {hotSessions.length > 0 ? (
+                <>
+                  <h3 className="status-subsection-title">Recent sessions</h3>
+                  <table className="table status-sessions-table">
+                    <thead>
+                      <tr>
+                        <th>Session</th>
+                        <th>Agent</th>
+                        <th>Model</th>
+                        <th>Context used</th>
+                        <th>Age</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hotSessions.map((s, i) => (
+                        <tr key={i}>
+                          <td className="mono" title={s.keySnippet}>
+                            {shortenMiddle(s.keySnippet, 40)}
+                          </td>
+                          <td className="mono">{s.agentId}</td>
+                          <td className="mono">{s.model}</td>
+                          <td className="mono">{s.percentUsed != null ? `${s.percentUsed}%` : '—'}</td>
+                          <td className="mono">{formatAgeMs(s.ageMs)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              ) : null}
+            </>
+          )}
         </section>
 
         <section className="card">
