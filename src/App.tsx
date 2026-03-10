@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import { type CronRun, extractRunHistoryDataset, formatRunStateLabel, summarizeJobRunHistory } from './runHistory.ts';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -138,6 +139,35 @@ function formatDateFromMs(epochMs?: number): string {
     return '—';
   }
   return new Date(epochMs).toLocaleString();
+}
+
+function formatDurationMs(durationMs?: number): string {
+  if (!durationMs || Number.isNaN(durationMs) || durationMs < 0) {
+    return '—';
+  }
+  if (durationMs < 1000) {
+    return `${Math.round(durationMs)}ms`;
+  }
+  if (durationMs < 60_000) {
+    return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
+  }
+
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = Math.round((durationMs % 60_000) / 1000);
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
+function formatRunMeta(run: CronRun): string {
+  const parts = [
+    run.durationMs ? `duration ${formatDurationMs(run.durationMs)}` : '',
+    run.provider ? `provider ${run.provider}` : '',
+    run.model ? `model ${run.model}` : '',
+    typeof run.delivered === 'boolean' ? (run.delivered ? 'delivered' : 'not delivered') : '',
+    run.nextRunAtMs ? `next ${formatDateFromMs(run.nextRunAtMs)}` : '',
+    run.sessionId ? `session ${run.sessionId}` : run.sessionKey ? `session ${run.sessionKey}` : '',
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(' · ') : 'No extra run metadata.';
 }
 
 function formatGeneratedAt(raw: unknown): string {
@@ -510,16 +540,21 @@ export default function App() {
   const [query, setQuery] = useState<string>('');
   const [enabledOnly, setEnabledOnly] = useState<boolean>(false);
   const [refreshHint, setRefreshHint] = useState<string>('');
+  const [runHistoryByJobId, setRunHistoryByJobId] = useState<Record<string, CronRun[]>>({});
+  const [runHistoryErrorsByJobId, setRunHistoryErrorsByJobId] = useState<Record<string, string>>({});
+  const [runHistoryLoaded, setRunHistoryLoaded] = useState<boolean>(false);
+  const [runHistoryNotice, setRunHistoryNotice] = useState<string>('');
   const [cronView, setCronView] = useState<CronView>('table');
 
   useEffect(() => {
     void (async () => {
       setError('');
 
-      const [metaResult, agentsResult, jobsResult] = await Promise.allSettled([
+      const [metaResult, agentsResult, jobsResult, runsResult] = await Promise.allSettled([
         loadJson('/data/meta.json'),
         loadJson('/data/agents.json'),
         loadJson('/data/cron-jobs.json'),
+        loadJson('/data/cron-runs.json'),
       ]);
 
       if (metaResult.status === 'fulfilled') {
@@ -566,6 +601,25 @@ export default function App() {
       } else {
         setJobs([]);
         setError(jobsResult.reason instanceof Error ? jobsResult.reason.message : 'Failed to load /data/cron-jobs.json');
+      }
+
+      if (runsResult.status === 'fulfilled') {
+        const runHistory = extractRunHistoryDataset(runsResult.value);
+        const loadedJobCount = Object.keys(runHistory.runsByJobId).length;
+        setRunHistoryByJobId(runHistory.runsByJobId);
+        setRunHistoryErrorsByJobId(runHistory.errorsByJobId);
+        setRunHistoryLoaded(true);
+        setRunHistoryNotice(
+          runHistory.notice ||
+            (loadedJobCount > 0
+              ? `Recent run history loaded for ${loadedJobCount} cron job${loadedJobCount === 1 ? '' : 's'}.`
+              : 'Recent run history snapshot loaded, but no runs were exported yet.'),
+        );
+      } else {
+        setRunHistoryByJobId({});
+        setRunHistoryErrorsByJobId({});
+        setRunHistoryLoaded(false);
+        setRunHistoryNotice('Recent run history is unavailable. Run ./refresh.sh to generate /data/cron-runs.json when supported.');
       }
     })();
   }, []);
@@ -678,6 +732,7 @@ export default function App() {
           <div className="hint">
             Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>.
           </div>
+          <div className="hint">{runHistoryNotice}</div>
           {refreshHint ? <div className="hint">{refreshHint}</div> : null}
         </section>
 
@@ -737,21 +792,28 @@ export default function App() {
                   <th>Next</th>
                   <th>Last</th>
                   <th>Last status</th>
+                  <th>Recent / blocker</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredJobs.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="small">
+                    <td colSpan={10} className="small">
                       No jobs match filter.
                     </td>
                   </tr>
                 ) : (
                   filteredJobs.map((job, index) => {
+                    const jobId = job.id || '';
                     const agentId = job.agentId || '(default)';
                     const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '—';
                     const thinking = job.payload?.thinking || job.thinking || '—';
                     const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+                    const jobRuns = jobId ? runHistoryByJobId[jobId] || [] : [];
+                    const jobRunHistory = summarizeJobRunHistory(jobRuns, {
+                      dataMissing: !runHistoryLoaded,
+                      exportError: jobId ? runHistoryErrorsByJobId[jobId] : '',
+                    });
 
                     return (
                       <tr key={job.id || `${job.name || 'job'}-${index}`}>
@@ -772,6 +834,66 @@ export default function App() {
                         <td className="mono">{formatDateFromMs(job.state?.lastRunAtMs)}</td>
                         <td>
                           <span className={badgeClass(status)}>{status}</span>
+                        </td>
+                        <td>
+                          <div className="run-history-cell">
+                            <div className="run-status-strip">
+                              {jobRunHistory.recentRuns.length > 0 ? (
+                                jobRunHistory.recentRuns.map((run, runIndex) => {
+                                  const label = formatRunStateLabel(run);
+
+                                  return (
+                                    <span
+                                      key={`${job.id || job.name || index}-${run.runAtMs || run.ts || runIndex}`}
+                                      className={badgeClass(label)}
+                                    >
+                                      {label}
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span className="badge idle">{runHistoryLoaded ? 'no runs' : 'n/a'}</span>
+                              )}
+                            </div>
+
+                            <div className="run-history-summary small">
+                              <span className={badgeClass(jobRunHistory.blockerTone)}>{jobRunHistory.blockerLabel}</span>{' '}
+                              {jobRunHistory.blockerDetail}
+                            </div>
+
+                            {jobRunHistory.recentRuns.length > 0 ? (
+                              <details className="run-history-details">
+                                <summary>Recent runs</summary>
+                                <div className="run-history-list">
+                                  {jobRunHistory.recentRuns.map((run, runIndex) => {
+                                    const label = formatRunStateLabel(run);
+
+                                    return (
+                                      <div
+                                        key={`${job.id || job.name || index}-detail-${run.runAtMs || run.ts || runIndex}`}
+                                        className="run-history-row"
+                                      >
+                                        <div className="run-history-row-head">
+                                          <span className="mono">{formatDateFromMs(run.runAtMs)}</span>
+                                          <span className={badgeClass(label)}>{label}</span>
+                                          {run.deliveryStatus ? (
+                                            <span className={badgeClass(run.deliveryStatus)}>{run.deliveryStatus}</span>
+                                          ) : null}
+                                          {typeof run.delivered === 'boolean' ? (
+                                            <span className={run.delivered ? 'badge ok' : 'badge err'}>
+                                              {run.delivered ? 'delivered' : 'not delivered'}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                        <div className="small">{run.summary || 'No run summary provided.'}</div>
+                                        <div className="small mono">{formatRunMeta(run)}</div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </details>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );

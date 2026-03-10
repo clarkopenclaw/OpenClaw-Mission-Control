@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:unit": "node --test src/runHistory.test.mjs"
   },
   "dependencies": {
     "croner": "^10.0.1",

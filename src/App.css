@@ -185,6 +185,55 @@ code {
   background: #f7f7f7;
 }
 
+.run-history-cell {
+  min-width: 280px;
+  display: grid;
+  gap: 6px;
+}
+
+.run-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.run-history-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.run-history-details {
+  border-top: 1px solid #eef0f6;
+  padding-top: 6px;
+}
+
+.run-history-details summary {
+  cursor: pointer;
+  color: #444;
+}
+
+.run-history-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.run-history-row {
+  border: 1px solid #eef0f6;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fafbff;
+  display: grid;
+  gap: 4px;
+}
+
+.run-history-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 .agenda {
   display: grid;
   gap: 14px;
@@ -467,6 +516,10 @@ code {
 
   .table {
     font-size: 12px;
+  }
+
+  .run-history-cell {
+    min-width: 220px;
   }
 
   .agenda-item {
