@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import { parsePlan, getPendingApprovals, type PendingApproval } from './planUtils';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -511,15 +512,18 @@ export default function App() {
   const [enabledOnly, setEnabledOnly] = useState<boolean>(false);
   const [refreshHint, setRefreshHint] = useState<string>('');
   const [cronView, setCronView] = useState<CronView>('table');
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
     void (async () => {
       setError('');
 
-      const [metaResult, agentsResult, jobsResult] = await Promise.allSettled([
+      const [metaResult, agentsResult, jobsResult, planResult] = await Promise.allSettled([
         loadJson('/data/meta.json'),
         loadJson('/data/agents.json'),
         loadJson('/data/cron-jobs.json'),
+        loadJson('/data/plan.json'),
       ]);
 
       if (metaResult.status === 'fulfilled') {
@@ -566,6 +570,13 @@ export default function App() {
       } else {
         setJobs([]);
         setError(jobsResult.reason instanceof Error ? jobsResult.reason.message : 'Failed to load /data/cron-jobs.json');
+      }
+
+      if (planResult.status === 'fulfilled') {
+        const plan = parsePlan(planResult.value);
+        setPendingApprovals(getPendingApprovals(plan));
+      } else {
+        setPendingApprovals([]);
       }
     })();
   }, []);
@@ -672,6 +683,41 @@ export default function App() {
       </header>
 
       <main className="container">
+        {pendingApprovals.length > 0 ? (
+          <section className="card waiting-on-ryan">
+            <h2>Waiting on Ryan</h2>
+            <div className="small" style={{ marginBottom: 8 }}>
+              {pendingApprovals.length} item{pendingApprovals.length === 1 ? '' : 's'} pending approval
+              {pendingApprovals[0] ? ` · Plan ${pendingApprovals[0].planId}` : ''}
+            </div>
+            <div className="approval-list">
+              {pendingApprovals.map((item) => (
+                <div key={item.task.idx} className="approval-item">
+                  <div className="approval-header">
+                    <span className="badge">#{item.task.idx}</span>
+                    <b>{item.task.title}</b>
+                  </div>
+                  <div className="small">{item.task.why}</div>
+                  <div className="approval-cmd-row">
+                    <code className="approval-cmd">{item.approvalCommand}</code>
+                    <button
+                      type="button"
+                      className="copy-btn"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(item.approvalCommand);
+                        setCopiedIdx(item.task.idx);
+                        setTimeout(() => setCopiedIdx(null), 1500);
+                      }}
+                    >
+                      {copiedIdx === item.task.idx ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="card">
           <h2>Data</h2>
           <div className="mono">Generated: {generatedAt}</div>

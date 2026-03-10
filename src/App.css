@@ -454,6 +454,49 @@ code {
   font-size: 12px;
 }
 
+.waiting-on-ryan {
+  border-left: 4px solid #e8a735;
+}
+
+.approval-list {
+  display: grid;
+  gap: 10px;
+}
+
+.approval-item {
+  padding: 10px;
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  background: #fafbff;
+  display: grid;
+  gap: 6px;
+}
+
+.approval-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.approval-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.approval-cmd {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 8px;
+  user-select: all;
+}
+
+.copy-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-width: 56px;
+}
+
 @media (max-width: 960px) {
   .header {
     align-items: flex-start;

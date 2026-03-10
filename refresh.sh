@@ -16,10 +16,19 @@ openclaw agents list --json > "$DATA_DIR/agents.json"
 # We keep this best-effort and don't fail refresh if unsupported.
 openclaw cron runs --help > "$DATA_DIR/cron-runs-help.txt" 2>&1 || true
 
+# Plan state (best-effort, non-fatal if missing)
+PLAN_SRC="${CRON_STATE_DIR:-$HOME/.openclaw/workspace-clark-workspace/.cron_state}/mission_control_plan.json"
+if [ -f "$PLAN_SRC" ]; then
+  cp "$PLAN_SRC" "$DATA_DIR/plan.json"
+  echo "Wrote: $DATA_DIR/plan.json"
+else
+  echo "Skipped: $PLAN_SRC not found (plan.json not exported)"
+fi
+
 # Timestamp
 node -e 'process.stdout.write(JSON.stringify({ generatedAt: Math.floor(Date.now() / 1000) }, null, 2) + "\n")' > "$DATA_DIR/meta.json"
 
 echo "Wrote: $DATA_DIR/cron-jobs.json"
 echo "Wrote: $DATA_DIR/agents.json"
-echo "Wrote: $DATA_DIR/cron-runs-help.txt" 
+echo "Wrote: $DATA_DIR/cron-runs-help.txt"
 echo "Wrote: $DATA_DIR/meta.json"
