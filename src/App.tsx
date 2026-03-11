@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import { BoardView } from './board';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -33,7 +34,7 @@ type Agent = {
   agentDefaults?: { model?: string };
 };
 
-type CronView = 'table' | 'week' | 'agenda';
+type CronView = 'table' | 'week' | 'agenda' | 'board';
 
 type AgendaItem = {
   runAtMs: number;
@@ -706,6 +707,13 @@ export default function App() {
               >
                 Agenda
               </button>
+              <button
+                type="button"
+                className={cronView === 'board' ? 'seg active' : 'seg'}
+                onClick={() => setCronView('board')}
+              >
+                Board
+              </button>
             </div>
           </div>
 
@@ -833,6 +841,10 @@ export default function App() {
                 ))
               )}
             </div>
+          ) : null}
+
+          {cronView === 'board' ? (
+            <BoardView jobs={filteredJobs} modelByAgentId={modelByAgentId} />
           ) : null}
 
           {cronView === 'week' ? (
