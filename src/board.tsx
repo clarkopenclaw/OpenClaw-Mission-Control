@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export type CronJob = {
   id?: string;
   name?: string;
@@ -81,18 +83,25 @@ function badgeClass(value: string): string {
   return 'badge';
 }
 
+function getThinking(job: CronJob): string | undefined {
+  return job.thinking || job.payload?.thinking || undefined;
+}
+
 function JobCard({
   job,
   model,
+  onClick,
 }: {
   job: CronJob;
   model: string;
+  onClick: () => void;
 }) {
   const agentId = job.agentId || '(default)';
   const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+  const thinking = getThinking(job);
 
   return (
-    <div className="board-card">
+    <div className="board-card" onClick={onClick} role="button" tabIndex={0}>
       <div className="board-card-header">
         <b className="board-card-name">{job.name || '—'}</b>
         <span className={badgeClass(status)}>{status}</span>
@@ -101,10 +110,85 @@ function JobCard({
         <div>{agentId}</div>
         <div>{model}</div>
       </div>
+      {thinking && <span className="badge board-card-thinking">thinking</span>}
       <div className="board-card-schedule mono">{formatSchedule(job.schedule)}</div>
+      {job.state?.lastRunAtMs ? (
+        <div className="board-card-last small">Last: {formatDateFromMs(job.state.lastRunAtMs)}</div>
+      ) : null}
       {job.state?.nextRunAtMs ? (
         <div className="board-card-next small">Next: {formatDateFromMs(job.state.nextRunAtMs)}</div>
       ) : null}
+    </div>
+  );
+}
+
+function JobDetailModal({
+  job,
+  model,
+  onClose,
+}: {
+  job: CronJob;
+  model: string;
+  onClose: () => void;
+}) {
+  const agentId = job.agentId || '(default)';
+  const status = job.state?.lastRunStatus || job.state?.lastStatus || '—';
+  const expr = job.schedule?.expr || job.schedule?.cron || '—';
+  const tz = job.schedule?.tz || job.schedule?.timezone || '—';
+  const thinking = getThinking(job);
+
+  return (
+    <div className="board-modal-backdrop" data-testid="modal-backdrop" onClick={onClose}>
+      <div className="board-modal" role="dialog" aria-label={job.name || 'Job details'} onClick={(e) => e.stopPropagation()}>
+        <div className="board-modal-header">
+          <h3>{job.name || '—'}</h3>
+          <button className="board-modal-close" aria-label="Close" onClick={onClose}>×</button>
+        </div>
+        <div className="board-modal-body">
+          <div className="board-modal-row">
+            <span className="board-modal-label">Status</span>
+            <span className={badgeClass(status)}>{status}</span>
+          </div>
+          <div className="board-modal-row">
+            <span className="board-modal-label">Enabled</span>
+            <span>{job.enabled ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="board-modal-row">
+            <span className="board-modal-label">Agent</span>
+            <span className="mono">{agentId}</span>
+          </div>
+          <div className="board-modal-row">
+            <span className="board-modal-label">Model</span>
+            <span className="mono">{model}</span>
+          </div>
+          {thinking && (
+            <div className="board-modal-row">
+              <span className="board-modal-label">Thinking</span>
+              <span>{thinking}</span>
+            </div>
+          )}
+          <div className="board-modal-row">
+            <span className="board-modal-label">Schedule</span>
+            <span className="mono">{expr}</span>
+          </div>
+          <div className="board-modal-row">
+            <span className="board-modal-label">Timezone</span>
+            <span className="mono">{tz}</span>
+          </div>
+          {job.state?.lastRunAtMs && (
+            <div className="board-modal-row">
+              <span className="board-modal-label">Last Run</span>
+              <span>{formatDateFromMs(job.state.lastRunAtMs)}</span>
+            </div>
+          )}
+          {job.state?.nextRunAtMs && (
+            <div className="board-modal-row">
+              <span className="board-modal-label">Next Run</span>
+              <span>{formatDateFromMs(job.state.nextRunAtMs)}</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -117,6 +201,7 @@ export function BoardView({
   modelByAgentId: Record<string, string>;
 }) {
   const classified = classifyJobsByStatus(jobs);
+  const [selectedJob, setSelectedJob] = useState<{ job: CronJob; model: string } | null>(null);
 
   return (
     <div className="board">
@@ -132,12 +217,26 @@ export function BoardView({
               {colJobs.map((job, idx) => {
                 const agentId = job.agentId || '(default)';
                 const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '—';
-                return <JobCard key={job.id || `${job.name || 'job'}-${idx}`} job={job} model={model} />;
+                return (
+                  <JobCard
+                    key={job.id || `${job.name || 'job'}-${idx}`}
+                    job={job}
+                    model={model}
+                    onClick={() => setSelectedJob({ job, model })}
+                  />
+                );
               })}
             </div>
           </div>
         );
       })}
+      {selectedJob && (
+        <JobDetailModal
+          job={selectedJob.job}
+          model={selectedJob.model}
+          onClose={() => setSelectedJob(null)}
+        />
+      )}
     </div>
   );
 }

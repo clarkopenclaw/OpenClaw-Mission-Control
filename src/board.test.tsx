@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { classifyJobsByStatus, BOARD_COLUMNS, BoardView } from './board';
 import type { CronJob } from './board';
 
@@ -136,5 +137,109 @@ describe('BoardView', () => {
     // All columns should exist but have 0 counts
     const zeros = screen.getAllByText('0');
     expect(zeros.length).toBe(4);
+  });
+
+  it('opens detail modal when a card is clicked', async () => {
+    const user = userEvent.setup();
+    const jobs = [makeJob({
+      id: 'j1',
+      name: 'Deploy Bot',
+      agentId: 'agent-x',
+      schedule: { expr: '0 9 * * *', tz: 'America/New_York' },
+      state: { lastRunStatus: 'ok', nextRunAtMs: Date.now() + 3600000, lastRunAtMs: Date.now() - 3600000 },
+    })];
+    render(<BoardView jobs={jobs} modelByAgentId={{ 'agent-x': 'claude-opus' }} />);
+
+    await user.click(screen.getByText('Deploy Bot'));
+
+    // Modal should show full details
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    // Modal contains schedule and timezone as separate fields
+    expect(within(dialog).getByText('0 9 * * *')).toBeInTheDocument();
+    expect(within(dialog).getByText('America/New_York')).toBeInTheDocument();
+    expect(within(dialog).getByText('agent-x')).toBeInTheDocument();
+    expect(within(dialog).getByText('claude-opus')).toBeInTheDocument();
+  });
+
+  it('closes detail modal when close button is clicked', async () => {
+    const user = userEvent.setup();
+    const jobs = [makeJob({ id: 'j1', name: 'My Job', state: { lastRunStatus: 'ok' } })];
+    render(<BoardView jobs={jobs} modelByAgentId={{}} />);
+
+    await user.click(screen.getByText('My Job'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Close'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes detail modal when backdrop is clicked', async () => {
+    const user = userEvent.setup();
+    const jobs = [makeJob({ id: 'j1', name: 'My Job', state: { lastRunStatus: 'ok' } })];
+    render(<BoardView jobs={jobs} modelByAgentId={{}} />);
+
+    await user.click(screen.getByText('My Job'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('modal-backdrop'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows last run time on cards when available', () => {
+    const lastRunAtMs = new Date('2026-03-10T12:00:00Z').getTime();
+    const jobs = [makeJob({
+      id: 'j1',
+      name: 'Timed Job',
+      state: { lastRunStatus: 'ok', lastRunAtMs },
+    })];
+    render(<BoardView jobs={jobs} modelByAgentId={{}} />);
+    expect(screen.getByText(/Last:/)).toBeInTheDocument();
+  });
+
+  it('shows thinking badge when job has thinking enabled', () => {
+    const jobs = [makeJob({
+      id: 'j1',
+      name: 'Think Job',
+      thinking: 'enabled',
+      state: { lastRunStatus: 'ok' },
+    })];
+    render(<BoardView jobs={jobs} modelByAgentId={{}} />);
+    expect(screen.getByText('thinking')).toBeInTheDocument();
+  });
+
+  it('does not show thinking badge when thinking is absent', () => {
+    const jobs = [makeJob({
+      id: 'j1',
+      name: 'No Think',
+      state: { lastRunStatus: 'ok' },
+    })];
+    // Clear thinking from the default makeJob
+    jobs[0].thinking = undefined;
+    render(<BoardView jobs={jobs} modelByAgentId={{}} />);
+    expect(screen.queryByText('thinking')).not.toBeInTheDocument();
+  });
+
+  it('shows detail modal with last run and thinking info', async () => {
+    const user = userEvent.setup();
+    const lastRunAtMs = new Date('2026-03-10T12:00:00Z').getTime();
+    const jobs = [makeJob({
+      id: 'j1',
+      name: 'Full Detail Job',
+      agentId: 'agent-y',
+      thinking: 'enabled',
+      enabled: true,
+      state: { lastRunStatus: 'ok', lastRunAtMs, nextRunAtMs: Date.now() + 7200000 },
+    })];
+    render(<BoardView jobs={jobs} modelByAgentId={{ 'agent-y': 'opus-4' }} />);
+
+    await user.click(screen.getByText('Full Detail Job'));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    // Should show status, enabled state, thinking inside modal
+    expect(within(dialog).getByText('ok')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Enabled/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Thinking/)).toBeInTheDocument();
   });
 });
