@@ -1,53 +1,60 @@
-# Mission Control (local)
+# Mission Control
 
-Local React dashboard for monitoring OpenClaw cron jobs and workflow health.
+Mission Control is moving from a local cron dashboard toward a browser-accessible operating cockpit with markdown-backed business records and Voice Mode intake.
 
 ## Stack
 - Vite + React + TypeScript
-- JSON data generated locally by `refresh.sh`
+- Express API server for app-backed workflows
+- SQLite for operational workflow state
+- Markdown under `mission/` as the future source of truth for published operating items
+
+## Current app surface
+- `/` — exception-first cockpit shell with live API-backed voice session summary
+- `/voice/new` — persisted voice-session creation flow
+- `/voice/:sessionId` — session detail + audit trail
+- `/ops/cron` — existing OpenClaw cron dashboard, now routed inside the app shell
 
 ## Quick start
-1) Generate fresh data:
-```bash
-cd ~/Documents/mission-control
-./refresh.sh
-```
-
-2) Install dependencies:
+1) Install dependencies:
 ```bash
 pnpm install
-# or
-npm install
 ```
 
-3) Start dev server:
+2) Start the API server:
 ```bash
-pnpm dev
-# or
-npm run dev
+pnpm run dev:server
 ```
 
-4) Open dashboard:
+3) Start the client:
+```bash
+pnpm run dev:client
+```
+
+4) Open Mission Control:
 ```text
 http://localhost:5173
 ```
 
-The app reads from `/data/*.json` (generated under `public/data/cron-jobs.json`, `public/data/agents.json`, `public/data/meta.json`).
+The Vite dev server proxies `/api/*` to `http://127.0.0.1:8787`.
 
-## Validate OpenClaw JSON parsing
+## Existing cron data flow
+The cron dashboard still reads from `/data/*.json` generated under `public/data/`.
+
+Generate fresh cron data with:
 ```bash
-node verify-data.mjs
+./refresh.sh
 ```
+
+## Voice Mode foundation in this PR
+- Adds a routed app shell and cockpit homepage
+- Introduces an Express API server with operator auth middleware
+- Adds SQLite-backed voice session creation + audit events
+- Scaffolds the `mission/` markdown content root for future publish flows
+- Keeps the existing cron UI intact under `/ops/cron`
 
 ## Build checks
 ```bash
-pnpm run lint && pnpm run typecheck && pnpm run build
-# or
-npm run lint && npm run typecheck && npm run build
+pnpm run lint
+pnpm run typecheck
+pnpm run build
 ```
-
-## Legacy static reference
-Old static files are kept under `legacy/`:
-- `legacy/index.html`
-- `legacy/app.js`
-- `legacy/style.css`
