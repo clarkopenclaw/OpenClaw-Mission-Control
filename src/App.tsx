@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import StatusBar from './components/StatusBar';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -852,6 +853,7 @@ export default function App() {
           ) : null}
         </section>
       </main>
+      <StatusBar />
     </>
   );
 }
