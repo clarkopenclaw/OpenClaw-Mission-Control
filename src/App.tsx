@@ -22,6 +22,12 @@ type CronJob = {
     lastRunAtMs?: number;
     lastRunStatus?: string;
     lastStatus?: string;
+    lastDurationMs?: number;
+    lastDeliveryStatus?: string;
+    lastDelivered?: boolean;
+    lastError?: string;
+    lastDeliveryError?: string;
+    runningAtMs?: number;
   };
 };
 
@@ -33,7 +39,8 @@ type Agent = {
   agentDefaults?: { model?: string };
 };
 
-type CronView = 'table' | 'week' | 'agenda';
+type CronView = 'table' | 'week' | 'agenda' | 'history';
+type HistoryStatusFilter = 'all' | 'ok' | 'error' | 'running' | 'other';
 
 type AgendaItem = {
   runAtMs: number;
@@ -52,6 +59,41 @@ type AgendaGroup = {
   items: AgendaItem[];
 };
 
+type RunHistoryIssue = {
+  jobId: string;
+  jobName: string;
+  message: string;
+};
+
+type RunHistoryTruncation = {
+  jobId: string;
+  jobName: string;
+  captured: number;
+  total: number;
+};
+
+type CronRun = {
+  key: string;
+  jobId: string;
+  jobName: string;
+  agentId: string;
+  enabled: boolean;
+  status: string;
+  action: string;
+  runAtMs: number;
+  finishedAtMs?: number;
+  durationMs?: number;
+  deliveryStatus: string;
+  delivered?: boolean;
+  model: string;
+  provider: string;
+  error: string;
+  summary: string;
+  totalTokens?: number;
+  sessionId: string;
+  sessionKey: string;
+};
+
 const AGENDA_LOOKAHEAD_DAYS = 7;
 const MAX_RUNS_PER_JOB = 20;
 const MAX_RUNS_PER_NOISY_JOB = 7;
@@ -60,7 +102,52 @@ const MAX_AGENDA_ITEMS_TOTAL = 250;
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
 
 function isRecord(value: unknown): value is AnyRecord {
-  return Boolean(value) && typeof value === 'object';
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function getNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && !Number.isNaN(value) ? value : undefined;
+}
+
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const next = getNumber(value);
+    if (typeof next === 'number') {
+      return next;
+    }
+  }
+  return undefined;
+}
+
+function extractArray(payload: unknown, keys: string[]): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (!isRecord(payload)) {
+    return [];
+  }
+
+  for (const key of keys) {
+    const candidate = payload[key];
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
 }
 
 async function loadJson(path: string): Promise<unknown> {
@@ -83,39 +170,62 @@ function pickAgentModel(agent: Agent): string {
 }
 
 function extractJobs(payload: unknown): CronJob[] {
-  if (Array.isArray(payload)) {
-    return payload as CronJob[];
-  }
-  if (!isRecord(payload)) {
-    return [];
-  }
-
-  const candidates = [payload.jobs, payload.data, payload.list, payload.items];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate as CronJob[];
-    }
-  }
-
-  return [];
+  return extractArray(payload, ['jobs', 'data', 'list', 'items']) as CronJob[];
 }
 
 function extractAgents(payload: unknown): Agent[] {
-  if (Array.isArray(payload)) {
-    return payload as Agent[];
-  }
-  if (!isRecord(payload)) {
-    return [];
+  return extractArray(payload, ['agents', 'data', 'list', 'items']) as Agent[];
+}
+
+function normalizeRunHistoryIssue(value: unknown): RunHistoryIssue | null {
+  if (!isRecord(value)) {
+    return null;
   }
 
-  const candidates = [payload.agents, payload.data, payload.list, payload.items];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate as Agent[];
-    }
+  const jobId = firstString(value.jobId, value.id);
+  if (!jobId) {
+    return null;
   }
 
-  return [];
+  return {
+    jobId,
+    jobName: firstString(value.jobName, value.name),
+    message: firstString(value.message, value.error) || 'Failed to fetch run history.',
+  };
+}
+
+function normalizeRunHistoryTruncation(value: unknown): RunHistoryTruncation | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const jobId = firstString(value.jobId, value.id);
+  const captured = firstNumber(value.captured, value.count);
+  const total = firstNumber(value.total, value.available);
+  if (!jobId || typeof captured !== 'number' || typeof total !== 'number') {
+    return null;
+  }
+
+  return {
+    jobId,
+    jobName: firstString(value.jobName, value.name),
+    captured,
+    total,
+  };
+}
+
+function extractRunHistoryPayload(payload: unknown): {
+  runs: AnyRecord[];
+  fetchErrors: RunHistoryIssue[];
+  truncatedJobs: RunHistoryTruncation[];
+} {
+  const runs = extractArray(payload, ['runs', 'entries', 'data', 'list', 'items']).filter(isRecord);
+  const fetchErrors = extractArray(payload, ['fetchErrors']).map(normalizeRunHistoryIssue).filter((value): value is RunHistoryIssue => value !== null);
+  const truncatedJobs = extractArray(payload, ['truncatedJobs'])
+    .map(normalizeRunHistoryTruncation)
+    .filter((value): value is RunHistoryTruncation => value !== null);
+
+  return { runs, fetchErrors, truncatedJobs };
 }
 
 function formatSchedule(schedule: CronJob['schedule']): string {
@@ -148,10 +258,46 @@ function formatGeneratedAt(raw: unknown): string {
   return new Date(epochMs).toLocaleString();
 }
 
+function formatDuration(durationMs?: number): string {
+  if (!durationMs || Number.isNaN(durationMs) || durationMs <= 0) {
+    return '—';
+  }
+  if (durationMs < 1000) {
+    return `${durationMs}ms`;
+  }
+  if (durationMs < 60_000) {
+    return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
+  }
+
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = Math.round((durationMs % 60_000) / 1000);
+  if (minutes < 60) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+function formatCount(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '—';
+  }
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value)}%`;
+}
+
 function badgeClass(value: string): string {
   const text = value.toLowerCase();
-  if (text.includes('ok')) return 'badge ok';
-  if (text.includes('err') || text.includes('fail')) return 'badge err';
+  if (text.includes('not-delivered')) return 'badge err';
+  if (text.includes('err') || text.includes('fail') || text.includes('block') || text.includes('timeout') || text.includes('cancel')) {
+    return 'badge err';
+  }
+  if (text.includes('deliver') || text.includes('ok') || text.includes('success')) return 'badge ok';
   if (text.includes('idle')) return 'badge idle';
   return 'badge';
 }
@@ -202,8 +348,22 @@ function shortenMiddle(text: string, maxLen: number): string {
   return `${text.slice(0, keep)}…${text.slice(text.length - keep)}`;
 }
 
+function truncateText(text: string, maxLen: number): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLen) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLen - 1)}…`;
+}
+
+function firstLine(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) || '';
+}
+
 function formatAgentId(agentId: string): string {
-  // Commonly looks like "openclaw/agent-name" or "agent-name".
   const cleaned = agentId.replace(/^openclaw\//, '');
   return shortenMiddle(cleaned, 18);
 }
@@ -333,7 +493,6 @@ function formatTime(epochMs: number, timeZone?: string): string {
   try {
     return new Date(epochMs).toLocaleTimeString(undefined, options);
   } catch {
-    // If we get an invalid timezone (or a host that doesn't support the IANA name), fall back to local.
     return new Date(epochMs).toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
@@ -376,10 +535,99 @@ function getCronTz(schedule?: CronJob['schedule']): string {
   return schedule.tz || schedule.timezone || '';
 }
 
+function usageTotal(value: unknown): number | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  return firstNumber(value.total_tokens, value.totalTokens, value.total);
+}
+
+function extractRunError(run: AnyRecord): string {
+  const direct = firstString(run.error, run.err, run.lastError, run.lastDeliveryError);
+  if (direct) {
+    return direct;
+  }
+
+  if (isRecord(run.error)) {
+    const nested = firstString(run.error.message, run.error.error, run.error.details);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  const summary = getString(run.summary);
+  const statusText = firstString(run.status, run.action).toLowerCase();
+  if (summary && (statusText.includes('err') || statusText.includes('fail') || statusText.includes('block') || statusText.includes('timeout'))) {
+    return firstLine(summary);
+  }
+
+  return '';
+}
+
+function normalizeRun(
+  run: AnyRecord,
+  index: number,
+  jobById: Map<string, CronJob>,
+  modelByAgentId: Record<string, string>,
+): CronRun | null {
+  const rawJobId = firstString(run.jobId, run.id);
+  const matchedJob = rawJobId ? jobById.get(rawJobId) : undefined;
+  const runAtMs = firstNumber(run.runAtMs, run.startedAtMs, run.ts, run.createdAtMs);
+  if (typeof runAtMs !== 'number') {
+    return null;
+  }
+
+  const agentId = firstString(run.agentId, matchedJob?.agentId) || '(default)';
+  const model = firstString(run.model, modelByAgentId[agentId], modelByAgentId['(default)']) || '—';
+  const status = firstString(run.status, run.lastRunStatus, run.lastStatus) || '—';
+  const action = firstString(run.action) || 'finished';
+  const deliveryStatus =
+    firstString(run.deliveryStatus) ||
+    (typeof run.delivered === 'boolean' ? (run.delivered ? 'delivered' : 'not-delivered') : '—');
+  const jobId = rawJobId || matchedJob?.id || `unknown-run-${index}`;
+
+  return {
+    key: firstString(run.sessionKey, run.sessionId) || `${jobId}-${runAtMs}-${index}`,
+    jobId,
+    jobName: firstString(run.jobName, run.name, matchedJob?.name) || 'Untitled job',
+    agentId,
+    enabled: typeof run.enabled === 'boolean' ? run.enabled : Boolean(matchedJob?.enabled),
+    status,
+    action,
+    runAtMs,
+    finishedAtMs: firstNumber(run.ts, run.finishedAtMs, run.completedAtMs),
+    durationMs: firstNumber(run.durationMs, run.elapsedMs, matchedJob?.state?.lastDurationMs),
+    deliveryStatus,
+    delivered: typeof run.delivered === 'boolean' ? run.delivered : matchedJob?.state?.lastDelivered,
+    model,
+    provider: firstString(run.provider) || '—',
+    error: extractRunError(run),
+    summary: getString(run.summary),
+    totalTokens: usageTotal(run.usage),
+    sessionId: firstString(run.sessionId),
+    sessionKey: firstString(run.sessionKey),
+  };
+}
+
 function startOfDayMs(epochMs: number): number {
   const d = new Date(epochMs);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
+}
+
+function historyStatusBucket(run: Pick<CronRun, 'status' | 'action' | 'error'>): Exclude<HistoryStatusFilter, 'all'> {
+  const text = `${run.status} ${run.action}`.toLowerCase();
+  if (text.includes('run') || text.includes('start') || text.includes('queue')) {
+    return 'running';
+  }
+  if (text.includes('ok') || text.includes('success')) {
+    return 'ok';
+  }
+  if (run.error || text.includes('err') || text.includes('fail') || text.includes('block') || text.includes('timeout') || text.includes('cancel')) {
+    return 'error';
+  }
+  return 'other';
 }
 
 function upcomingRunsForJob(job: CronJob, startAtMs: number, endAtMs: number): { runs: number[]; wasCapped: boolean } {
@@ -408,11 +656,8 @@ function upcomingRunsForJob(job: CronJob, startAtMs: number, endAtMs: number): {
       if (nextMs > endAtMs) break;
 
       runs.push(nextMs);
-
-      // Avoid accidental infinite loops if a library returns the same run time.
       cursor = new Date(nextMs + 1000);
 
-      // For very noisy schedules, stop collecting candidates once we know we must cap.
       if (runs.length > MAX_RUNS_PER_JOB * 6) {
         break;
       }
@@ -422,16 +667,14 @@ function upcomingRunsForJob(job: CronJob, startAtMs: number, endAtMs: number): {
       return { runs, wasCapped: false };
     }
 
-    // Decide if this is "noisy" (e.g. */30). If so, show at most 1 run/day.
-    const NOISY_INTERVAL_MS = 2 * 60 * 60 * 1000;
+    const noisyIntervalMs = 2 * 60 * 60 * 1000;
     const minGapMs = runs.length >= 2 ? Math.min(...runs.slice(1).map((ms, idx) => ms - runs[idx])) : Infinity;
-    const isNoisy = minGapMs < NOISY_INTERVAL_MS;
+    const isNoisy = minGapMs < noisyIntervalMs;
 
     if (!isNoisy) {
       return { runs: runs.slice(0, MAX_RUNS_PER_JOB), wasCapped: true };
     }
 
-    // Noisy schedule: show only the first run per day in the job's timezone (or local if tz missing).
     const capped: number[] = [];
     const seenDays = new Set<string>();
 
@@ -502,24 +745,52 @@ function groupAgendaByDay(items: AgendaItem[], timeZone?: string): AgendaGroup[]
     .sort((a, b) => a.key.localeCompare(b.key));
 }
 
+function searchableJobText(job: CronJob, modelByAgentId: Record<string, string>): string {
+  const agentId = job.agentId || '(default)';
+  const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '';
+  const thinking = job.payload?.thinking || job.thinking || '';
+  const status = job.state?.lastRunStatus || job.state?.lastStatus || '';
+  const lastError = job.state?.lastError || job.state?.lastDeliveryError || '';
+
+  return [job.name, job.id, agentId, model, thinking, formatSchedule(job.schedule), status, lastError]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .toLowerCase();
+}
+
+function searchableRunText(run: CronRun): string {
+  return [run.jobName, run.jobId, run.agentId, run.model, run.status, run.action, run.error, run.summary, run.deliveryStatus]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 export default function App() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [modelByAgentId, setModelByAgentId] = useState<Record<string, string>>({});
   const [generatedAt, setGeneratedAt] = useState<string>('Loading...');
   const [error, setError] = useState<string>('');
+  const [runHistoryError, setRunHistoryError] = useState<string>('');
+  const [runs, setRuns] = useState<AnyRecord[]>([]);
+  const [runFetchErrors, setRunFetchErrors] = useState<RunHistoryIssue[]>([]);
+  const [truncatedRunJobs, setTruncatedRunJobs] = useState<RunHistoryTruncation[]>([]);
   const [query, setQuery] = useState<string>('');
   const [enabledOnly, setEnabledOnly] = useState<boolean>(false);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<HistoryStatusFilter>('all');
+  const [historyErrorsOnly, setHistoryErrorsOnly] = useState<boolean>(false);
   const [refreshHint, setRefreshHint] = useState<string>('');
   const [cronView, setCronView] = useState<CronView>('table');
 
   useEffect(() => {
     void (async () => {
       setError('');
+      setRunHistoryError('');
 
-      const [metaResult, agentsResult, jobsResult] = await Promise.allSettled([
+      const [metaResult, agentsResult, jobsResult, runsResult] = await Promise.allSettled([
         loadJson('/data/meta.json'),
         loadJson('/data/agents.json'),
         loadJson('/data/cron-jobs.json'),
+        loadJson('/data/cron-runs.json'),
       ]);
 
       if (metaResult.status === 'fulfilled') {
@@ -567,6 +838,20 @@ export default function App() {
         setJobs([]);
         setError(jobsResult.reason instanceof Error ? jobsResult.reason.message : 'Failed to load /data/cron-jobs.json');
       }
+
+      if (runsResult.status === 'fulfilled') {
+        const historyPayload = extractRunHistoryPayload(runsResult.value);
+        setRuns(historyPayload.runs);
+        setRunFetchErrors(historyPayload.fetchErrors);
+        setTruncatedRunJobs(historyPayload.truncatedJobs);
+      } else {
+        setRuns([]);
+        setRunFetchErrors([]);
+        setTruncatedRunJobs([]);
+        setRunHistoryError(
+          runsResult.reason instanceof Error ? runsResult.reason.message : 'Failed to load /data/cron-runs.json',
+        );
+      }
     })();
   }, []);
 
@@ -574,13 +859,12 @@ export default function App() {
     const q = query.trim().toLowerCase();
 
     return jobs.filter((job) => {
-      const name = String(job.name || '').toLowerCase();
-      const agentId = String(job.agentId || '').toLowerCase();
-      const passesQuery = !q || name.includes(q) || agentId.includes(q);
+      const haystack = searchableJobText(job, modelByAgentId);
+      const passesQuery = !q || haystack.includes(q);
       const passesEnabled = !enabledOnly || Boolean(job.enabled);
       return passesQuery && passesEnabled;
     });
-  }, [enabledOnly, jobs, query]);
+  }, [enabledOnly, jobs, modelByAgentId, query]);
 
   const agenda = useMemo(() => {
     const nowMs = Date.now();
@@ -651,6 +935,80 @@ export default function App() {
     };
   }, [filteredJobs]);
 
+  const jobById = useMemo(() => {
+    const map = new Map<string, CronJob>();
+    for (const job of jobs) {
+      if (job.id) {
+        map.set(job.id, job);
+      }
+    }
+    return map;
+  }, [jobs]);
+
+  const historyRuns = useMemo(() => {
+    const normalized = runs
+      .map((run, index) => normalizeRun(run, index, jobById, modelByAgentId))
+      .filter((value): value is CronRun => value !== null);
+
+    normalized.sort((left, right) => {
+      if (left.runAtMs !== right.runAtMs) return right.runAtMs - left.runAtMs;
+      return (right.finishedAtMs ?? 0) - (left.finishedAtMs ?? 0);
+    });
+
+    return normalized;
+  }, [jobById, modelByAgentId, runs]);
+
+  const filteredHistoryRuns = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    return historyRuns.filter((run) => {
+      const passesQuery = !q || searchableRunText(run).includes(q);
+      const passesEnabled = !enabledOnly || run.enabled;
+      const passesStatus = historyStatusFilter === 'all' || historyStatusBucket(run) === historyStatusFilter;
+      const passesErrorsOnly = !historyErrorsOnly || Boolean(run.error);
+      return passesQuery && passesEnabled && passesStatus && passesErrorsOnly;
+    });
+  }, [enabledOnly, historyErrorsOnly, historyRuns, historyStatusFilter, query]);
+
+  const historySummary = useMemo(() => {
+    const totalRuns = filteredHistoryRuns.length;
+    const jobsTouched = new Set(filteredHistoryRuns.map((run) => run.jobId)).size;
+    const okRuns = filteredHistoryRuns.filter((run) => historyStatusBucket(run) === 'ok').length;
+    const errorRuns = filteredHistoryRuns.filter((run) => historyStatusBucket(run) === 'error').length;
+    const durations = filteredHistoryRuns
+      .map((run) => run.durationMs)
+      .filter((value): value is number => typeof value === 'number' && value > 0);
+
+    return {
+      totalRuns,
+      jobsTouched,
+      okRuns,
+      errorRuns,
+      successRate: totalRuns ? (okRuns / totalRuns) * 100 : 0,
+      avgDurationMs: durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : undefined,
+    };
+  }, [filteredHistoryRuns]);
+
+  const historyFetchNote = useMemo(() => {
+    if (!runFetchErrors.length) {
+      return '';
+    }
+
+    const first = runFetchErrors[0];
+    const label = first.jobName || first.jobId;
+    return `Refresh skipped ${runFetchErrors.length} job${runFetchErrors.length === 1 ? '' : 's'}. First issue: ${label}: ${first.message}`;
+  }, [runFetchErrors]);
+
+  const historyTruncationNote = useMemo(() => {
+    if (!truncatedRunJobs.length) {
+      return '';
+    }
+
+    const first = truncatedRunJobs[0];
+    const label = first.jobName || first.jobId;
+    return `Some jobs have more recorded runs than were captured in this refresh. Example: ${label} (${first.captured} of ${first.total}).`;
+  }, [truncatedRunJobs]);
+
   return (
     <>
       <header className="header">
@@ -661,7 +1019,7 @@ export default function App() {
         <div className="actions">
           <button
             type="button"
-            onClick={() => setRefreshHint('Run ./refresh.sh in ~/Documents/mission-control, then reload this page.')}
+            onClick={() => setRefreshHint('Run ./refresh.sh from this repo, then reload this page.')}
           >
             Refresh data
           </button>
@@ -676,7 +1034,7 @@ export default function App() {
           <h2>Data</h2>
           <div className="mono">Generated: {generatedAt}</div>
           <div className="hint">
-            Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>.
+            Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>, including cron run history.
           </div>
           {refreshHint ? <div className="hint">{refreshHint}</div> : null}
         </section>
@@ -706,6 +1064,13 @@ export default function App() {
               >
                 Agenda
               </button>
+              <button
+                type="button"
+                className={cronView === 'history' ? 'seg active' : 'seg'}
+                onClick={() => setCronView('history')}
+              >
+                History
+              </button>
             </div>
           </div>
 
@@ -714,13 +1079,39 @@ export default function App() {
               id="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Filter by name/agent…"
+              placeholder="Filter by job, ID, agent, model, status…"
             />
             <label>
               <input type="checkbox" checked={enabledOnly} onChange={(event) => setEnabledOnly(event.target.checked)} />{' '}
               Enabled only
             </label>
           </div>
+
+          {cronView === 'history' ? (
+            <div className="history-toolbar">
+              <label className="history-filter">
+                <span className="small">Status</span>
+                <select
+                  value={historyStatusFilter}
+                  onChange={(event) => setHistoryStatusFilter(event.target.value as HistoryStatusFilter)}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="ok">Success</option>
+                  <option value="error">Errors</option>
+                  <option value="running">Running</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="history-filter history-filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={historyErrorsOnly}
+                  onChange={(event) => setHistoryErrorsOnly(event.target.checked)}
+                />{' '}
+                Errors only
+              </label>
+            </div>
+          ) : null}
 
           {error ? <div className="small">Failed to load jobs: {error}. Run ./refresh.sh.</div> : null}
 
@@ -848,6 +1239,88 @@ export default function App() {
               </div>
 
               <WeekTimeGrid days={week.days} />
+            </div>
+          ) : null}
+
+          {cronView === 'history' ? (
+            <div className="history">
+              <div className="agenda-meta small">Recorded cron executions, newest first. Filters update both the stats and the log.</div>
+
+              {runHistoryError ? (
+                <div className="history-note">
+                  Run history is unavailable right now ({runHistoryError}). Run <code>./refresh.sh</code> to generate{' '}
+                  <code>/data/cron-runs.json</code>.
+                </div>
+              ) : null}
+
+              {!runHistoryError && historyFetchNote ? <div className="history-note">{truncateText(historyFetchNote, 220)}</div> : null}
+              {!runHistoryError && historyTruncationNote ? (
+                <div className="history-note">{truncateText(historyTruncationNote, 220)}</div>
+              ) : null}
+
+              <div className="history-stats">
+                <div className="history-stat">
+                  <div className="small">Runs shown</div>
+                  <div className="history-stat-value">{formatCount(historySummary.totalRuns)}</div>
+                  <div className="small">{formatCount(historySummary.jobsTouched)} jobs in view</div>
+                </div>
+                <div className="history-stat">
+                  <div className="small">Success rate</div>
+                  <div className="history-stat-value">{formatPercent(historySummary.successRate)}</div>
+                  <div className="small">{formatCount(historySummary.okRuns)} successful runs</div>
+                </div>
+                <div className="history-stat">
+                  <div className="small">Error runs</div>
+                  <div className="history-stat-value">{formatCount(historySummary.errorRuns)}</div>
+                  <div className="small">Explicit failures or blocked runs</div>
+                </div>
+                <div className="history-stat">
+                  <div className="small">Avg duration</div>
+                  <div className="history-stat-value">{formatDuration(historySummary.avgDurationMs)}</div>
+                  <div className="small">Across runs with a recorded duration</div>
+                </div>
+              </div>
+
+              {filteredHistoryRuns.length === 0 ? (
+                <div className="history-empty">
+                  {runHistoryError
+                    ? 'Run ./refresh.sh to generate history data, then reload this page.'
+                    : 'No recorded runs match the current filters.'}
+                </div>
+              ) : (
+                <div className="history-list">
+                  {filteredHistoryRuns.map((run) => (
+                    <article key={run.key} className="history-item">
+                      <div className="history-item-top">
+                        <div className="history-item-copy">
+                          <div className="history-item-title">
+                            <b>{run.jobName}</b>
+                          </div>
+                          <div className="small mono">{formatDateFromMs(run.runAtMs)}</div>
+                        </div>
+                        <div className="history-item-badges">
+                          <span className={badgeClass(run.status)}>{run.status}</span>
+                          {run.action && run.action !== 'finished' ? <span className="badge">{run.action}</span> : null}
+                          <span className="badge">{run.enabled ? 'enabled' : 'disabled'}</span>
+                          {run.deliveryStatus !== '—' ? (
+                            <span className={badgeClass(run.deliveryStatus)}>{run.deliveryStatus}</span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="history-item-meta small mono">
+                        Agent: {run.agentId} · Model: {run.model} · Duration: {formatDuration(run.durationMs)}
+                        {run.totalTokens ? ` · Tokens: ${formatCount(run.totalTokens)}` : ''}
+                      </div>
+                      {run.finishedAtMs ? (
+                        <div className="history-item-meta small mono">Finished: {formatDateFromMs(run.finishedAtMs)}</div>
+                      ) : null}
+                      {run.error ? <div className="history-item-error">{truncateText(run.error, 220)}</div> : null}
+                      {run.summary ? <div className="history-item-summary">{truncateText(run.summary, 320)}</div> : null}
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           ) : null}
         </section>
