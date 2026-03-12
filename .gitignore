@@ -1,6 +1,8 @@
 node_modules/
+node-compile-cache/
 dist/
 .vite/
+.tmp/
 *.tsbuildinfo
 .DS_Store
 

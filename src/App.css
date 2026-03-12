@@ -55,6 +55,7 @@ h1 {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .actions {
@@ -133,6 +134,7 @@ code {
   gap: 12px;
   align-items: center;
   margin: 10px 0;
+  flex-wrap: wrap;
 }
 
 #q {
@@ -188,6 +190,125 @@ code {
 .agenda {
   display: grid;
   gap: 14px;
+}
+
+.history {
+  display: grid;
+  gap: 14px;
+}
+
+.history-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.history-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-filter select {
+  border: 1px solid #d7dbe8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+  font: inherit;
+  color: #111;
+}
+
+.history-filter-checkbox {
+  border: 1px solid #d7dbe8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fafbff;
+}
+
+.history-note,
+.history-empty {
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  background: #fafbff;
+  padding: 12px;
+}
+
+.history-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-stat {
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  background: #fafbff;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.history-stat-value {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+  color: #111;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  background: #fafbff;
+}
+
+.history-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.history-item-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.history-item-title {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.history-item-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.history-item-meta {
+  line-height: 1.4;
+}
+
+.history-item-error {
+  border-left: 3px solid #d95d5d;
+  padding-left: 10px;
+  color: #812f2f;
+  font-size: 13px;
+}
+
+.history-item-summary {
+  color: #333;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .agenda-meta {
@@ -470,6 +591,24 @@ code {
   }
 
   .agenda-item {
+    grid-template-columns: 1fr;
+  }
+
+  .history-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-item-top {
+    flex-direction: column;
+  }
+
+  .history-item-badges {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .history-stats {
     grid-template-columns: 1fr;
   }
 }
