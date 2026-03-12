@@ -9,7 +9,7 @@ Local React dashboard for monitoring OpenClaw cron jobs and workflow health.
 ## Quick start
 1) Generate fresh data:
 ```bash
-cd ~/Documents/mission-control
+cd /Users/clarkopenclaw/.openclaw/workspace-clark-workspace/_repos/OpenClaw-Mission-Control
 ./refresh.sh
 ```
 
@@ -33,6 +33,14 @@ http://localhost:5173
 ```
 
 The app reads from `/data/*.json` (generated under `public/data/cron-jobs.json`, `public/data/agents.json`, `public/data/meta.json`).
+
+## Homepage
+The homepage is an exception-first cockpit built from those local generated JSON files. Above the fold it highlights:
+- Needs attention
+- Waiting on Ryan
+- Recently shipped
+
+The full automation explorer stays below the fold with search plus table/calendar/agenda views.
 
 ## Validate OpenClaw JSON parsing
 ```bash
