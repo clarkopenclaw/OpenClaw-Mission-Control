@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import HomepageSection from './components/HomepageSection';
+import { buildHomepageModel } from './lib/homepage';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -502,6 +504,18 @@ function groupAgendaByDay(items: AgendaItem[], timeZone?: string): AgendaGroup[]
     .sort((a, b) => a.key.localeCompare(b.key));
 }
 
+function searchableJobText(job: CronJob, modelByAgentId: Record<string, string>): string {
+  const agentId = job.agentId || '(default)';
+  const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '';
+  const thinking = job.payload?.thinking || job.thinking || '';
+  const status = job.state?.lastRunStatus || job.state?.lastStatus || '';
+
+  return [job.name, job.id, agentId, model, thinking, formatSchedule(job.schedule), status]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .toLowerCase();
+}
+
 export default function App() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [modelByAgentId, setModelByAgentId] = useState<Record<string, string>>({});
@@ -574,13 +588,14 @@ export default function App() {
     const q = query.trim().toLowerCase();
 
     return jobs.filter((job) => {
-      const name = String(job.name || '').toLowerCase();
-      const agentId = String(job.agentId || '').toLowerCase();
-      const passesQuery = !q || name.includes(q) || agentId.includes(q);
+      const haystack = searchableJobText(job, modelByAgentId);
+      const passesQuery = !q || haystack.includes(q);
       const passesEnabled = !enabledOnly || Boolean(job.enabled);
       return passesQuery && passesEnabled;
     });
-  }, [enabledOnly, jobs, query]);
+  }, [enabledOnly, jobs, modelByAgentId, query]);
+
+  const homepage = useMemo(() => buildHomepageModel(jobs, modelByAgentId), [jobs, modelByAgentId]);
 
   const agenda = useMemo(() => {
     const nowMs = Date.now();
@@ -656,12 +671,18 @@ export default function App() {
       <header className="header">
         <div>
           <h1>Mission Control</h1>
-          <div className="sub">Local dashboard for OpenClaw cron health</div>
+          <div className="sub">Exception-first business cockpit for OpenClaw operations</div>
+          <div className="header-meta small">
+            <span>Generated: {generatedAt}</span>
+            <span>{jobs.length} automations</span>
+            <span>{homepage.needsAttention.length} active exceptions</span>
+          </div>
+          {refreshHint ? <div className="hint">{refreshHint}</div> : null}
         </div>
         <div className="actions">
           <button
             type="button"
-            onClick={() => setRefreshHint('Run ./refresh.sh in ~/Documents/mission-control, then reload this page.')}
+            onClick={() => setRefreshHint('Run ./refresh.sh from this repo, then reload this page.')}
           >
             Refresh data
           </button>
@@ -672,18 +693,40 @@ export default function App() {
       </header>
 
       <main className="container">
-        <section className="card">
-          <h2>Data</h2>
-          <div className="mono">Generated: {generatedAt}</div>
-          <div className="hint">
-            Run <code>./refresh.sh</code> to refresh <code>/data/*.json</code>.
-          </div>
-          {refreshHint ? <div className="hint">{refreshHint}</div> : null}
-        </section>
+        {error ? <div className="banner err">Failed to load jobs: {error}. Run <code>./refresh.sh</code>.</div> : null}
+
+        <div className="homepage-grid">
+          <HomepageSection
+            title="Needs attention"
+            description="Failures, broken delivery, and enabled jobs with missing run state."
+            emptyText="No active exceptions right now."
+            items={homepage.needsAttention}
+            tone="attention"
+          />
+
+          <HomepageSection
+            title="Waiting on Ryan"
+            description="Approval-gated or manual-decision workflows inferred from current job definitions."
+            emptyText="No explicit Ryan approvals or manual decisions detected."
+            items={homepage.waitingOnRyan}
+            tone="waiting"
+          />
+
+          <HomepageSection
+            title="Recently shipped"
+            description="Recent successful delivered runs as the best current proxy for shipped output."
+            emptyText="No recent successful delivered runs found."
+            items={homepage.recentlyShipped}
+            tone="shipped"
+          />
+        </div>
 
         <section className="card">
           <div className="card-title">
-            <h2>Cron jobs</h2>
+            <div className="card-title-copy">
+              <h2>All automations</h2>
+              <div className="small">Detailed explorer for the full cron inventory.</div>
+            </div>
             <div className="segmented" role="group" aria-label="Cron jobs view">
               <button
                 type="button"
@@ -714,15 +757,13 @@ export default function App() {
               id="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Filter by name/agent…"
+              placeholder="Filter by name, ID, agent, model…"
             />
             <label>
               <input type="checkbox" checked={enabledOnly} onChange={(event) => setEnabledOnly(event.target.checked)} />{' '}
               Enabled only
             </label>
           </div>
-
-          {error ? <div className="small">Failed to load jobs: {error}. Run ./refresh.sh.</div> : null}
 
           {cronView === 'table' ? (
             <table className="table">
