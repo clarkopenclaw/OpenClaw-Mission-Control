@@ -454,6 +454,49 @@ code {
   font-size: 12px;
 }
 
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #e6e8ef;
+  background: #fff;
+}
+
+.status-bar__time {
+  font-variant-numeric: tabular-nums;
+}
+
+.status-bar__version {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-bar__connection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-bar__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.status-bar__dot.online {
+  background: #46a06c;
+  box-shadow: 0 0 0 4px rgb(70 160 108 / 16%);
+}
+
+.status-bar__dot.offline {
+  background: #d95d5d;
+  box-shadow: 0 0 0 4px rgb(217 93 93 / 16%);
+}
+
 @media (max-width: 960px) {
   .header {
     align-items: flex-start;
@@ -471,5 +514,10 @@ code {
 
   .agenda-item {
     grid-template-columns: 1fr;
+  }
+
+  .status-bar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
