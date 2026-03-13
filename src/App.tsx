@@ -85,6 +85,15 @@ const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
   },
 ];
 
+const VIEW_SHORTCUTS: Record<string, View> = {
+  '1': 'dashboard',
+  '2': 'calendar',
+  '3': 'kanban',
+  '4': 'jobs',
+  '5': 'insights',
+  '6': 'taskboard',
+};
+
 export default function App() {
   const [view, setView] = useState<View>('dashboard');
   const [jobs, setJobs] = useState<CronJob[]>([]);
@@ -149,6 +158,23 @@ export default function App() {
         setError(jobsResult.reason instanceof Error ? jobsResult.reason.message : 'Failed to load cron-jobs.json');
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const nextView = VIEW_SHORTCUTS[event.key];
+      if (nextView) {
+        setView(nextView);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const renderView = () => {
