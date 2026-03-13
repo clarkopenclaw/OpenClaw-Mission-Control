@@ -34,7 +34,7 @@ body {
 
 .app-layout {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 180px 1fr;
   grid-template-rows: auto 1fr;
   min-height: 100vh;
 }
@@ -149,30 +149,36 @@ h1 {
 .sidebar {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 0;
+  align-items: stretch;
+  gap: 2px;
+  padding: 12px 8px;
   background: var(--surface);
   border-right: 1px solid var(--border);
+  overflow-y: auto;
 }
 
 .nav-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
-  display: grid;
-  place-items: center;
-  padding: 0;
+  padding: 0 8px;
   color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
   transition: all 0.15s ease;
 }
 
 .nav-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .nav-btn:hover {
@@ -181,10 +187,81 @@ h1 {
   border-color: var(--border);
 }
 
+.nav-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nav-btn.active {
   color: var(--accent);
   background: var(--accent-dim);
   border-color: rgba(240, 180, 41, 0.25);
+}
+
+/* ── Sidebar Projects ── */
+
+.sidebar-projects {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 6px 0;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  gap: 2px;
+}
+
+.sidebar-projects-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 4px 6px 6px;
+  text-align: center;
+}
+
+.sidebar-project-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: left;
+  transition: all 0.15s ease;
+  overflow: hidden;
+}
+
+.sidebar-project-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.sidebar-project-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: rgba(240, 180, 41, 0.25);
+}
+
+.sidebar-project-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sidebar-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-spacer {
@@ -192,16 +269,14 @@ h1 {
 }
 
 .sidebar-sync {
-  writing-mode: vertical-lr;
-  text-orientation: mixed;
-  transform: rotate(180deg);
   font-size: 10px;
-  padding: 8px 4px;
+  padding: 6px 8px;
   border: none;
   background: none;
   gap: 4px;
   white-space: nowrap;
-  border-radius: 0;
+  border-radius: 6px;
+  justify-content: center;
 }
 
 /* ── Content ── */
@@ -1035,6 +1110,33 @@ code {
 .insights-list-item { font-size: 13px; color: var(--text-secondary); padding: 6px 0; border-bottom: 1px solid var(--border); }
 .insights-timestamp { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
 
+/* ── Project Board Header ── */
+
+.project-board-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.project-board-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.project-board-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.project-board-repo {
+  color: var(--text-dim);
+}
+
 /* ── Task Board ── */
 
 .task-board {
@@ -1797,11 +1899,46 @@ code {
     justify-content: center;
     border-right: none;
     border-top: 1px solid var(--border);
-    padding: 8px 0;
+    padding: 8px;
     position: sticky;
     bottom: 0;
     z-index: 10;
     gap: 8px;
+    overflow-x: auto;
+  }
+
+  .nav-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .nav-btn-label {
+    display: none;
+  }
+
+  .sidebar-projects {
+    flex-direction: row;
+    border-top: none;
+    border-left: 1px solid var(--border);
+    padding: 0 0 0 8px;
+    margin-top: 0;
+    margin-left: 4px;
+  }
+
+  .sidebar-projects-label {
+    display: none;
+  }
+
+  .sidebar-project-btn {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .sidebar-project-name {
+    display: none;
   }
 
   .sidebar-spacer {
