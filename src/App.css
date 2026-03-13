@@ -1077,6 +1077,107 @@ code {
   color: var(--err);
 }
 
+.task-board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.task-btn-create {
+  border-color: rgba(240, 180, 41, 0.3);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.task-btn-create:hover {
+  background: var(--accent-dim);
+  border-color: rgba(240, 180, 41, 0.5);
+}
+
+.create-task-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.create-task-form {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 24px;
+  width: 480px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-task-form h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.create-task-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.create-task-form input,
+.create-task-form select,
+.create-task-form textarea {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: 'Outfit', system-ui, sans-serif;
+  outline: none;
+}
+
+.create-task-form input:focus,
+.create-task-form select:focus,
+.create-task-form textarea:focus {
+  border-color: var(--accent);
+}
+
+.create-task-form textarea {
+  resize: vertical;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.create-task-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.create-task-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.create-task-actions .task-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+.task-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 960px) {

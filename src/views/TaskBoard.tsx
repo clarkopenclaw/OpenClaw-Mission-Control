@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Task, TaskStatus, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
+import { Task, TaskStatus, TaskType, TaskPriority, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
 
 const API_BASE = '/api';
 const POLL_INTERVAL = 5000;
@@ -9,6 +9,7 @@ type Props = Record<string, never>;
 export default function TaskBoard(_props: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -49,6 +50,28 @@ export default function TaskBoard(_props: Props) {
     }
   };
 
+  const handleCreate = async (data: {
+    title: string;
+    type: TaskType;
+    priority: TaskPriority;
+    body: string;
+    repo: string;
+    base_branch: string;
+  }) => {
+    try {
+      const res = await fetch(`${API_BASE}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setShowCreate(false);
+      await fetchTasks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Create failed');
+    }
+  };
+
   const handleMove = async (taskId: string, newStatus: TaskStatus) => {
     try {
       const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
@@ -65,6 +88,12 @@ export default function TaskBoard(_props: Props) {
 
   return (
     <div className="task-board">
+      <div className="task-board-toolbar">
+        <button type="button" className="task-btn task-btn-create" onClick={() => setShowCreate(true)}>
+          + New Task
+        </button>
+      </div>
+      {showCreate && <CreateTaskForm onSubmit={handleCreate} onCancel={() => setShowCreate(false)} />}
       {error && <div className="error-bar">{error}</div>}
       <div className="task-board-columns">
         {columns.map((col) => (
@@ -88,6 +117,91 @@ export default function TaskBoard(_props: Props) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CreateTaskForm({
+  onSubmit,
+  onCancel,
+}: {
+  onSubmit: (data: {
+    title: string;
+    type: TaskType;
+    priority: TaskPriority;
+    body: string;
+    repo: string;
+    base_branch: string;
+  }) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [type, setType] = useState<TaskType>('coding');
+  const [priority, setPriority] = useState<TaskPriority>('P1');
+  const [body, setBody] = useState('');
+  const [repo, setRepo] = useState('~/Documents/mission-control');
+  const [baseBranch, setBaseBranch] = useState('main');
+
+  return (
+    <div className="create-task-overlay">
+      <div className="create-task-form">
+        <h3>New Task</h3>
+        <label>
+          Title
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs to be done?" />
+        </label>
+        <div className="create-task-row">
+          <label>
+            Type
+            <select value={type} onChange={(e) => setType(e.target.value as TaskType)}>
+              <option value="coding">Coding</option>
+              <option value="research">Research</option>
+              <option value="outbound">Outbound</option>
+              <option value="ops">Ops</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <label>
+            Priority
+            <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
+              <option value="P0">P0 - Critical</option>
+              <option value="P1">P1 - High</option>
+              <option value="P2">P2 - Medium</option>
+              <option value="P3">P3 - Low</option>
+            </select>
+          </label>
+        </div>
+        <div className="create-task-row">
+          <label>
+            Repo
+            <input value={repo} onChange={(e) => setRepo(e.target.value)} />
+          </label>
+          <label>
+            Base Branch
+            <input value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} />
+          </label>
+        </div>
+        <label>
+          Description
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={4}
+            placeholder="Context and instructions for the agent..."
+          />
+        </label>
+        <div className="create-task-actions">
+          <button type="button" className="task-btn" onClick={onCancel}>Cancel</button>
+          <button
+            type="button"
+            className="task-btn task-btn-approve"
+            disabled={!title.trim()}
+            onClick={() => onSubmit({ title, type, priority, body, repo, base_branch: baseBranch })}
+          >
+            Create
+          </button>
+        </div>
       </div>
     </div>
   );
