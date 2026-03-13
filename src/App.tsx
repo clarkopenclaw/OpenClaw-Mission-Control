@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Cron } from 'croner';
+import packageJson from '../package.json';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -655,7 +656,7 @@ export default function App() {
     <>
       <header className="header">
         <div>
-          <h1>Mission Control</h1>
+          <h1 title={`Mission Control v${packageJson.version}`}>Mission Control</h1>
           <div className="sub">Local dashboard for OpenClaw cron health</div>
         </div>
         <div className="actions">
