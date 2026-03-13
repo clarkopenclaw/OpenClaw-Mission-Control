@@ -317,6 +317,21 @@ export function formatTime(epochMs: number, timeZone?: string): string {
   }
 }
 
+// ── Task Events (ACP Debug Panel) ──
+
+export type TaskEvents = {
+  phase: string;
+  run_id: string | null;
+  worktree: string | null;
+  branch: string | null;
+  mode_proven: boolean | null;
+  gate_passed: boolean | null;
+  pr_url: string | null;
+  log_tail: string[];
+  gate: Record<string, unknown> | null;
+  error: string | null;
+};
+
 // ── Task Board Types ──
 
 export type TaskType = 'coding' | 'research' | 'outbound' | 'ops' | 'manual';
@@ -350,6 +365,15 @@ export type Task = {
   unblock_attempted?: boolean;
   merge_retry?: boolean;
   body?: string;
+  depends_on?: string[];
+  project?: string;
+};
+
+export type Project = {
+  slug: string;
+  name: string;
+  repo: string;
+  color: string;
 };
 
 export const TASK_COLUMNS: { id: TaskStatus; label: string; colorVar: string }[] = [
