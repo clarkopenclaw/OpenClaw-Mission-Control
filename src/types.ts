@@ -35,7 +35,7 @@ export type Agent = {
   agentDefaults?: { model?: string };
 };
 
-export type CronView = 'table' | 'agenda';
+export type CronView = 'table' | 'agenda' | 'calendar' | 'board';
 
 export type AgendaItem = {
   runAtMs: number;
@@ -330,12 +330,20 @@ export type TaskEvents = {
   log_tail: string[];
   gate: Record<string, unknown> | null;
   error: string | null;
+  artifacts?: TaskArtifact[];
+};
+
+export type TaskArtifact = {
+  kind: 'plan' | 'report' | 'deliverable';
+  title: string;
+  content: string;
+  created_at: string;
 };
 
 // ── Task Board Types ──
 
 export type TaskType = 'coding' | 'research' | 'outbound' | 'ops' | 'manual';
-export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'human_review' | 'merging' | 'blocked' | 'done';
+export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'supervising' | 'human_review' | 'merging' | 'blocked' | 'done';
 export type TaskPriority = 'P0' | 'P1' | 'P2' | 'P3';
 export type ReviewType = 'pr' | 'report' | 'decision' | 'approval';
 
@@ -367,6 +375,18 @@ export type Task = {
   body?: string;
   depends_on?: string[];
   project?: string;
+  supervisor_data?: {
+    step: string;
+    proposed_plan?: string;
+    questions?: string[];
+    run_dir?: string;
+    run_id?: string;
+    session?: string;
+    repo?: string;
+    worktree_dir?: string;
+    transcript_path?: string;
+  };
+  supervisor_rounds?: number;
 };
 
 export type Project = {

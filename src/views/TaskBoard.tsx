@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Task, TaskStatus, TaskType, TaskPriority, TaskEvents, Project, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
+import Markdown from 'react-markdown';
+import { Task, TaskStatus, TaskType, TaskPriority, TaskEvents, TaskArtifact, Project, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
 
 export const API_BASE = '/api';
 const POLL_INTERVAL = 5000;
@@ -49,7 +50,10 @@ export default function TaskBoard({ projectSlug }: { projectSlug?: string } = {}
       : tasks;
     return TASK_COLUMNS.map((col) => ({
       ...col,
-      tasks: filtered.filter((t) => t.status === col.id),
+      tasks: filtered.filter((t) => {
+        if (col.id === 'in_progress') return t.status === 'in_progress' || t.status === 'supervising';
+        return t.status === col.id;
+      }),
     }));
   }, [tasks, projectSlug, projectFilter]);
 
@@ -116,6 +120,18 @@ export default function TaskBoard({ projectSlug }: { projectSlug?: string } = {}
       await fetchTasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Update failed');
+    }
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (!window.confirm('Delete this task? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${taskId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (selectedTaskId === taskId) setSelectedTaskId(null);
+      await fetchTasks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
     }
   };
 
@@ -204,6 +220,7 @@ export default function TaskBoard({ projectSlug }: { projectSlug?: string } = {}
             onAction={handleAction}
             onMove={handleMove}
             onUpdate={handleUpdate}
+            onDelete={handleDelete}
           />
         );
       })()}
@@ -357,16 +374,18 @@ function CreateTaskForm({
             </button>
           </div>
         )}
-        <div className="create-task-row">
-          <label>
-            Repo
-            <input value={repo} onChange={(e) => setRepo(e.target.value)} />
-          </label>
-          <label>
-            Base Branch
-            <input value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} />
-          </label>
-        </div>
+        {type === 'coding' && (
+          <div className="create-task-row">
+            <label>
+              Repo
+              <input value={repo} onChange={(e) => setRepo(e.target.value)} />
+            </label>
+            <label>
+              Base Branch
+              <input value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} />
+            </label>
+          </div>
+        )}
         <label>
           Description
           <textarea
@@ -391,7 +410,9 @@ function CreateTaskForm({
             className="task-btn task-btn-approve"
             disabled={!title.trim()}
             onClick={() => onSubmit({
-              title, type, priority, body, repo, base_branch: baseBranch,
+              title, type, priority, body,
+              repo: type === 'coding' ? repo : '',
+              base_branch: type === 'coding' ? baseBranch : '',
               ...(selectedDeps.length > 0 ? { depends_on: selectedDeps } : {}),
               ...(selectedProject ? { project: selectedProject } : {}),
             })}
@@ -556,6 +577,12 @@ function TaskCard({
         })()}
       </div>
 
+      {task.status === 'supervising' && (
+        <div className="small mono" style={{ color: '#fbbf24', marginTop: 4 }}>
+          Awaiting review &middot; {task.supervisor_data?.step?.replace(/-/g, ' ') || 'supervising'}
+        </div>
+      )}
+
       {task.status === 'in_progress' && elapsed !== null && (
         <div className="task-card-progress">
           <span className="small mono" style={{ color: 'var(--text-dim)' }}>
@@ -664,6 +691,52 @@ function TaskCard({
   );
 }
 
+function ArtifactSection({ artifacts }: { artifacts: TaskArtifact[] }) {
+  const sorted = useMemo(
+    () => [...artifacts].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [artifacts],
+  );
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]));
+
+  const toggle = (idx: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  return (
+    <>
+      <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-dim)' }}>Artifacts</h4>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {sorted.map((a, i) => (
+          <div key={i}>
+            <button
+              type="button"
+              className="task-artifact-header"
+              style={expanded.has(i) ? { borderRadius: '6px 6px 0 0' } : undefined}
+              onClick={() => toggle(i)}
+            >
+              <span>
+                {expanded.has(i) ? '\u25be' : '\u25b8'}{' '}
+                {a.title}
+              </span>
+              <span className="small mono" style={{ color: 'var(--text-dim)' }}>
+                {a.kind} &middot; {new Date(a.created_at).toLocaleString()}
+              </span>
+            </button>
+            {expanded.has(i) && (
+              <div className="task-artifact-content">{a.content}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function TaskDetailPanel({
   task,
   tasks,
@@ -671,6 +744,7 @@ function TaskDetailPanel({
   onAction,
   onMove,
   onUpdate,
+  onDelete,
 }: {
   task: Task;
   tasks: Task[];
@@ -678,6 +752,7 @@ function TaskDetailPanel({
   onAction: (id: string, action: string) => void;
   onMove: (id: string, status: TaskStatus) => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
+  onDelete: (id: string) => void;
 }) {
   const [events, setEvents] = useState<TaskEvents | null>(null);
   const [editingBody, setEditingBody] = useState(false);
@@ -882,6 +957,110 @@ function TaskDetailPanel({
           )}
         </div>
 
+        {/* Artifacts section */}
+        {events?.artifacts && events.artifacts.length > 0 && (
+          <div className="task-detail-section">
+            <ArtifactSection artifacts={events.artifacts} />
+          </div>
+        )}
+
+        {/* Supervisor Review section */}
+        {task.supervisor_data && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <h4 style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Supervisor Review</h4>
+              <span style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                borderRadius: 4,
+                background: 'rgba(251,191,36,0.15)',
+                color: '#fbbf24',
+                border: '1px solid rgba(251,191,36,0.3)',
+              }}>
+                {task.supervisor_data.step.replace(/-/g, ' ')}
+              </span>
+              {task.supervisor_rounds != null && task.supervisor_rounds > 0 && (
+                <span className="small mono" style={{ color: 'var(--text-dim)' }}>
+                  round {task.supervisor_rounds}
+                </span>
+              )}
+            </div>
+
+            {task.supervisor_data.proposed_plan && (
+              <div style={{ marginBottom: 12 }}>
+                <span className="small" style={{ color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Proposed Plan</span>
+                <div className="supervisor-plan-md" style={{
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: 'var(--text)',
+                  background: 'var(--surface-alt, #2a2a3e)',
+                  border: '1px solid var(--border, #333)',
+                  borderRadius: 6,
+                  padding: 12,
+                  maxHeight: 300,
+                  overflowY: 'auto',
+                }}>
+                  <Markdown>
+                    {task.supervisor_data.proposed_plan
+                      .replace(/<\/?proposed_plan>/g, '')
+                      .trim()}
+                  </Markdown>
+                </div>
+              </div>
+            )}
+
+            {task.supervisor_data.questions && task.supervisor_data.questions.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <span className="small" style={{ color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Agent Questions</span>
+                <div style={{
+                  background: 'var(--surface-alt, #2a2a3e)',
+                  border: '1px solid var(--border, #333)',
+                  borderRadius: 6,
+                  padding: 12,
+                }}>
+                  {task.supervisor_data.questions.map((q, i) => (
+                    <div key={i} style={{ fontSize: 12, color: 'var(--text)', marginBottom: i < task.supervisor_data!.questions!.length - 1 ? 8 : 0 }}>
+                      {q}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {task.supervisor_data.run_id && (
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '2px 8px', fontSize: 11, color: 'var(--text-dim)' }}>
+                <span>Run ID</span>
+                <span className="mono">{task.supervisor_data.run_id}</span>
+                {task.supervisor_data.session && (
+                  <>
+                    <span>Session</span>
+                    <span className="mono">{task.supervisor_data.session}</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {task.status === 'supervising' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="task-btn task-btn-approve"
+                  onClick={() => onAction(task.id, 'reject')}
+                >
+                  Approve &amp; Re-queue
+                </button>
+                <button
+                  type="button"
+                  className="task-btn task-btn-reject"
+                  onClick={() => onMove(task.id, 'blocked')}
+                >
+                  Block
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Dependencies section */}
         <div className="task-detail-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -982,6 +1161,13 @@ function TaskDetailPanel({
               Unblock
             </button>
           )}
+          <button
+            type="button"
+            className="task-btn task-btn-reject"
+            onClick={() => onDelete(task.id)}
+          >
+            Delete
+          </button>
         </div>
 
         {/* Events/Debug section */}

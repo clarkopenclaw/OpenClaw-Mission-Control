@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
-  CronJob, CronView,
+  CronJob, Agent, CronView, AgendaGroup,
   AGENDA_LOOKAHEAD_DAYS, MAX_AGENDA_ITEMS_TOTAL, LOCAL_TIME_ZONE,
   formatSchedule, formatDateFromMs, statusClass,
   buildAgendaItems, groupAgendaByDay, formatTime,
@@ -8,13 +9,78 @@ import {
 
 type Props = {
   jobs: CronJob[];
+  agents: Agent[];
   modelByAgentId: Record<string, string>;
 };
 
-export default function Jobs({ jobs, modelByAgentId }: Props) {
-  const [query, setQuery] = useState('');
-  const [enabledOnly, setEnabledOnly] = useState(false);
-  const [cronView, setCronView] = useState<CronView>('table');
+const VALID_TABS: CronView[] = ['table', 'agenda', 'calendar', 'board'];
+
+// ── Calendar helpers (from Calendar.tsx) ──
+
+function timeStr(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function relLabel(ms: number): string {
+  const diff = ms - Date.now();
+  if (diff < 0) return 'past';
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `in ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return `in ${hrs}h${rem > 0 ? ` ${rem}m` : ''}`;
+}
+
+function dayHeading(dateKeyStr: string, todayKey: string, tomorrowKey: string, headingFromGroup: string): string {
+  if (dateKeyStr === todayKey) return 'Today';
+  if (dateKeyStr === tomorrowKey) return 'Tomorrow';
+  return headingFromGroup;
+}
+
+// ── Board helpers (from Kanban.tsx) ──
+
+type Column = {
+  id: string;
+  label: string;
+  colorVar: string;
+  jobs: CronJob[];
+};
+
+function deriveStatus(job: CronJob): string {
+  const s = (job.state?.lastRunStatus || job.state?.lastStatus || '').toLowerCase();
+  if (!job.enabled) return 'disabled';
+  if (s.includes('err') || s.includes('fail')) return 'error';
+  if (s.includes('ok')) return 'active';
+  return 'scheduled';
+}
+
+export default function Jobs({ jobs, agents, modelByAgentId }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') || 'table';
+  const cronView: CronView = VALID_TABS.includes(tabParam as CronView) ? (tabParam as CronView) : 'table';
+
+  const [query, enabledOnly] = useMemo(() => {
+    return [searchParams.get('q') || '', false];
+  }, [searchParams]);
+
+  const setQuery = (q: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (q) next.set('q', q);
+      else next.delete('q');
+      return next;
+    }, { replace: true });
+  };
+
+  const setCronView = (tab: CronView) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'table') next.delete('tab');
+      else next.set('tab', tab);
+      return next;
+    }, { replace: true });
+  };
 
   const filteredJobs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -27,6 +93,7 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
     });
   }, [enabledOnly, jobs, query]);
 
+  // ── Agenda data ──
   const agenda = useMemo(() => {
     const nowMs = Date.now();
     const startOfToday = new Date();
@@ -46,7 +113,78 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
     };
   }, [filteredJobs]);
 
+  // ── Calendar data ──
+  const enabledFilteredJobs = useMemo(() => filteredJobs.filter((j) => j.enabled), [filteredJobs]);
+
+  const agentColorMap = useMemo(() => {
+    const colors = ['var(--accent)', 'var(--ok)', 'var(--err)', '#8b5cf6', '#3b82f6'];
+    const ids = Array.from(new Set(enabledFilteredJobs.map((j) => j.agentId || '(default)')));
+    const map: Record<string, string> = {};
+    ids.forEach((id, i) => { map[id] = colors[i % colors.length]; });
+    return map;
+  }, [enabledFilteredJobs]);
+
+  const agentNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of agents) if (a.id) map[a.id] = a.name || a.id;
+    return map;
+  }, [agents]);
+
+  const calendarData = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + AGENDA_LOOKAHEAD_DAYS);
+    end.setHours(23, 59, 59, 999);
+
+    const allItems = buildAgendaItems(enabledFilteredJobs, start.getTime(), end.getTime());
+    const grouped = groupAgendaByDay(allItems);
+
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const fmt = (d: Date) => {
+      const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+      const byType = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+      return `${byType.year}-${byType.month}-${byType.day}`;
+    };
+
+    return {
+      groups: grouped,
+      todayKey: fmt(todayStart),
+      tomorrowKey: fmt(tomorrowStart),
+    };
+  }, [enabledFilteredJobs]);
+
+  // ── Board data ──
+  const columns = useMemo<Column[]>(() => {
+    const active: CronJob[] = [];
+    const scheduled: CronJob[] = [];
+    const error: CronJob[] = [];
+    const disabled: CronJob[] = [];
+
+    for (const job of filteredJobs) {
+      switch (deriveStatus(job)) {
+        case 'active': active.push(job); break;
+        case 'scheduled': scheduled.push(job); break;
+        case 'error': error.push(job); break;
+        case 'disabled': disabled.push(job); break;
+      }
+    }
+
+    return [
+      { id: 'active', label: 'Active', colorVar: 'var(--ok)', jobs: active },
+      { id: 'scheduled', label: 'Scheduled', colorVar: 'var(--accent)', jobs: scheduled },
+      { id: 'error', label: 'Error', colorVar: 'var(--err)', jobs: error },
+      { id: 'disabled', label: 'Disabled', colorVar: 'var(--text-dim)', jobs: disabled },
+    ];
+  }, [filteredJobs]);
+
   const enabledCount = jobs.filter((j) => j.enabled).length;
+  const nowMs = Date.now();
 
   return (
     <section className="section">
@@ -58,20 +196,10 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
           </span>
         </div>
         <div className="segmented" role="group" aria-label="View toggle">
-          <button
-            type="button"
-            className={cronView === 'table' ? 'seg active' : 'seg'}
-            onClick={() => setCronView('table')}
-          >
-            Table
-          </button>
-          <button
-            type="button"
-            className={cronView === 'agenda' ? 'seg active' : 'seg'}
-            onClick={() => setCronView('agenda')}
-          >
-            Agenda
-          </button>
+          <button type="button" className={cronView === 'table' ? 'seg active' : 'seg'} onClick={() => setCronView('table')}>Table</button>
+          <button type="button" className={cronView === 'agenda' ? 'seg active' : 'seg'} onClick={() => setCronView('agenda')}>Agenda</button>
+          <button type="button" className={cronView === 'calendar' ? 'seg active' : 'seg'} onClick={() => setCronView('calendar')}>Calendar</button>
+          <button type="button" className={cronView === 'board' ? 'seg active' : 'seg'} onClick={() => setCronView('board')}>Board</button>
         </div>
       </div>
 
@@ -82,12 +210,9 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by name or agent..."
         />
-        <label className="filter-label">
-          <input type="checkbox" checked={enabledOnly} onChange={(e) => setEnabledOnly(e.target.checked)} />
-          Active only
-        </label>
       </div>
 
+      {/* ── Table tab ── */}
       {cronView === 'table' ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
@@ -151,6 +276,7 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
         </div>
       ) : null}
 
+      {/* ── Agenda tab ── */}
       {cronView === 'agenda' ? (
         <div className="agenda">
           <div className="agenda-meta">
@@ -207,6 +333,112 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
               </div>
             ))
           )}
+        </div>
+      ) : null}
+
+      {/* ── Calendar tab ── */}
+      {cronView === 'calendar' ? (
+        <div className="cal-today">
+          <div className="cal-today-header">
+            <span className="cal-today-title">Calendar</span>
+            <span className="mono small">{AGENDA_LOOKAHEAD_DAYS}-day view</span>
+          </div>
+
+          {calendarData.groups.reduce((sum, g) => sum + g.items.length, 0) === 0 ? (
+            <div className="empty-state">No runs scheduled in the next {AGENDA_LOOKAHEAD_DAYS} days.</div>
+          ) : (
+            <div className="cal-timeline">
+              {calendarData.groups.map((group: AgendaGroup) => {
+                const isToday = group.key === calendarData.todayKey;
+                const isTomorrow = group.key === calendarData.tomorrowKey;
+                const showRelTime = isToday || isTomorrow;
+
+                let nowIndex = -1;
+                if (isToday) {
+                  nowIndex = group.items.findIndex((i) => i.runAtMs > nowMs);
+                  if (nowIndex === -1) nowIndex = group.items.length;
+                }
+
+                return (
+                  <div key={group.key}>
+                    <div className="cal-day-heading">{dayHeading(group.key, calendarData.todayKey, calendarData.tomorrowKey, group.heading)}</div>
+                    {group.items.map((item, i) => {
+                      const color = agentColorMap[item.agentId] || 'var(--text-dim)';
+                      const isPast = item.runAtMs < nowMs;
+                      const showNow = isToday && i === nowIndex;
+
+                      return (
+                        <div key={`${item.job.id || item.job.name}-${item.runAtMs}`}>
+                          {showNow && (
+                            <div className="cal-now-marker">
+                              <span className="cal-now-dot" />
+                              <span className="cal-now-label">Now</span>
+                              <span className="cal-now-line" />
+                            </div>
+                          )}
+                          <div className={`cal-run${isPast ? ' past' : ''}`}>
+                            <div className="cal-run-time mono">{timeStr(item.runAtMs)}</div>
+                            <div className="cal-run-bar" style={{ background: color }} />
+                            <div className="cal-run-info">
+                              <span className="cal-run-name">{item.job.name || '--'}</span>
+                              <span className="small mono">{agentNameMap[item.agentId] || item.agentId}</span>
+                            </div>
+                            {!isPast && showRelTime && <span className="cal-run-rel mono small">{relLabel(item.runAtMs)}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {isToday && nowIndex === group.items.length && (
+                      <div className="cal-now-marker">
+                        <span className="cal-now-dot" />
+                        <span className="cal-now-label">Now</span>
+                        <span className="cal-now-line" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* ── Board tab ── */}
+      {cronView === 'board' ? (
+        <div className="kanban">
+          {columns.map((col) => (
+            <div key={col.id} className="kanban-col">
+              <div className="kanban-col-header" style={{ borderColor: col.colorVar }}>
+                <span style={{ color: col.colorVar }}>{col.label}</span>
+                <span className="kanban-col-count">{col.jobs.length}</span>
+              </div>
+              <div className="kanban-col-body">
+                {col.jobs.map((job, idx) => {
+                  const agentId = job.agentId || '(default)';
+                  const status = job.state?.lastRunStatus || job.state?.lastStatus || '--';
+                  return (
+                    <div key={job.id || `${job.name || 'job'}-${idx}`} className="kanban-card">
+                      <div className="kanban-card-name">{job.name || '--'}</div>
+                      <div className="small mono">{agentId}</div>
+                      <div className="small mono" style={{ color: 'var(--text-dim)' }}>{formatSchedule(job.schedule)}</div>
+                      <div className="kanban-card-footer">
+                        {job.state?.nextRunAtMs ? (
+                          <span className="small mono">{formatDateFromMs(job.state.nextRunAtMs)}</span>
+                        ) : null}
+                        <span className={statusClass(status)}>
+                          <span className="status-dot" />
+                          {status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {col.jobs.length === 0 && (
+                  <div className="empty-state" style={{ padding: '24px 8px' }}>None</div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
     </section>

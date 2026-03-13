@@ -1575,6 +1575,46 @@ code {
   margin-top: 8px;
 }
 
+/* ── Task Artifacts ── */
+
+.task-artifact-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.task-artifact-header:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-light);
+  color: var(--text);
+}
+
+.task-artifact-content {
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 10px;
+}
+
 .task-detail-actions {
   display: flex;
   gap: 8px;
@@ -2024,3 +2064,40 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+/* Supervisor plan markdown */
+.supervisor-plan-md h1,
+.supervisor-plan-md h2,
+.supervisor-plan-md h3,
+.supervisor-plan-md h4 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+.supervisor-plan-md h2 { font-size: 14px; }
+.supervisor-plan-md p { margin: 4px 0; }
+.supervisor-plan-md ul,
+.supervisor-plan-md ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.supervisor-plan-md li { margin: 2px 0; }
+.supervisor-plan-md code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.supervisor-plan-md pre {
+  background: rgba(0,0,0,0.3);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 4px 0;
+}
+.supervisor-plan-md pre code {
+  background: none;
+  padding: 0;
+}
+.supervisor-plan-md strong { color: var(--text); }
+.supervisor-plan-md hr { border-color: var(--border, #333); margin: 8px 0; }

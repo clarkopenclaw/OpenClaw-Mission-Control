@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import {
   CronJob, Agent, Project,
   isRecord, loadJson, pickAgentModel, extractJobs, extractAgents, formatGeneratedAt,
 } from './types';
 import packageJson from '../package.json';
 import Dashboard from './views/Dashboard';
-import Calendar from './views/Calendar';
-import Kanban from './views/Kanban';
 import Jobs from './views/Jobs';
 import Insights from './views/Insights';
 import TaskBoard from './views/TaskBoard';
 import { API_BASE } from './views/TaskBoard';
 import ProjectBoard from './views/ProjectBoard';
-
-type View = 'dashboard' | 'calendar' | 'kanban' | 'jobs' | 'insights' | 'taskboard' | 'project';
 
 type SpeechRecognitionErrorCode =
   | 'aborted'
@@ -74,14 +71,11 @@ const REFRESH_HINT_MESSAGE = 'Run ./refresh.sh in ~/Documents/mission-control, t
 const OPENCLAW_URL = 'http://127.0.0.1:18789/';
 const VOICE_HELP_TEXT = 'Say a view name, "next view", "sync data", "open OpenClaw", or "voice off".';
 
-const VOICE_VIEW_PHRASES: Record<View, string[]> = {
-  dashboard: ['dashboard', 'home'],
-  calendar: ['calendar', 'schedule'],
-  kanban: ['kanban', 'kanban board', 'pipeline'],
-  jobs: ['jobs', 'job list'],
-  insights: ['insights', 'analytics'],
-  taskboard: ['task board', 'tasks', 'taskboard'],
-  project: [],
+const VOICE_VIEW_PHRASES: Record<string, string[]> = {
+  '/': ['dashboard', 'home'],
+  '/jobs': ['jobs', 'job list', 'calendar', 'schedule', 'kanban', 'kanban board', 'pipeline'],
+  '/tasks': ['task board', 'tasks', 'taskboard'],
+  '/insights': ['insights', 'analytics'],
 };
 
 function normalizeVoiceText(text: string) {
@@ -96,9 +90,9 @@ function clipVoiceText(text: string) {
   return text.length > 54 ? `${text.slice(0, 51)}...` : text;
 }
 
-const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
+const NAV_ITEMS: { path: string; label: string; icon: JSX.Element }[] = [
   {
-    id: 'dashboard',
+    path: '/',
     label: 'Dashboard',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -110,30 +104,7 @@ const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
     ),
   },
   {
-    id: 'calendar',
-    label: 'Calendar',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    id: 'kanban',
-    label: 'Kanban',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="5" height="18" rx="1" />
-        <rect x="10" y="3" width="5" height="12" rx="1" />
-        <rect x="17" y="3" width="5" height="15" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    id: 'jobs',
+    path: '/jobs',
     label: 'Jobs',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -147,7 +118,17 @@ const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
     ),
   },
   {
-    id: 'insights',
+    path: '/tasks',
+    label: 'Task Board',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+    ),
+  },
+  {
+    path: '/insights',
     label: 'Insights',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -157,29 +138,18 @@ const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
       </svg>
     ),
   },
-  {
-    id: 'taskboard',
-    label: 'Task Board',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 11l3 3L22 4" />
-        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-      </svg>
-    ),
-  },
 ];
 
-const VIEW_SHORTCUTS: Record<string, View> = {
-  '1': 'dashboard',
-  '2': 'calendar',
-  '3': 'kanban',
-  '4': 'jobs',
-  '5': 'insights',
-  '6': 'taskboard',
+const VIEW_SHORTCUTS: Record<string, string> = {
+  '1': '/',
+  '2': '/jobs',
+  '3': '/tasks',
+  '4': '/insights',
 };
 
 export default function App() {
-  const [view, setView] = useState<View>('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelByAgentId, setModelByAgentId] = useState<Record<string, string>>({});
@@ -198,21 +168,20 @@ export default function App() {
   const voiceEnabledRef = useRef(false);
   const generatedAtRef = useRef(generatedAt);
   const runVoiceCommandRef = useRef<(rawTranscript: string) => void>(() => {});
-  const viewRef = useRef(view);
-  const navIndexByView = useRef<Record<View, number>>(
-    NAV_ITEMS.reduce((acc, item, index) => {
-      acc[item.id] = index;
-      return acc;
-    }, {} as Record<View, number>),
-  );
+  const locationRef = useRef(location.pathname);
+  const navigateRef = useRef(navigate);
 
   useEffect(() => {
     generatedAtRef.current = generatedAt;
   }, [generatedAt]);
 
   useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
+    locationRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   const speak = (text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -224,11 +193,16 @@ export default function App() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const setViewFromVoice = (nextView: View) => {
-    setView(nextView);
+  const navLabelByPath = useRef<Record<string, string>>(
+    Object.fromEntries(NAV_ITEMS.map((item) => [item.path, item.label])),
+  );
+
+  const setViewFromVoice = (path: string) => {
+    navigateRef.current(path);
     setVoiceError('');
-    setVoiceStatus(`Opened ${NAV_ITEMS[navIndexByView.current[nextView]].label}.`);
-    speak(`${NAV_ITEMS[navIndexByView.current[nextView]].label} opened.`);
+    const label = navLabelByPath.current[path] || path;
+    setVoiceStatus(`Opened ${label}.`);
+    speak(`${label} opened.`);
   };
 
   const runVoiceCommand = (rawTranscript: string) => {
@@ -271,7 +245,7 @@ export default function App() {
     }
 
     if (transcript.includes('where am i') || transcript.includes('current view') || transcript.includes('status report')) {
-      const label = NAV_ITEMS[navIndexByView.current[viewRef.current]].label;
+      const label = navLabelByPath.current[locationRef.current] || locationRef.current;
       const generatedAtLabel = generatedAtRef.current === 'Loading...' ? 'Data is still loading.' : `Data snapshot: ${generatedAtRef.current}.`;
       setVoiceStatus(`${label}. ${generatedAtLabel}`);
       speak(`You are on ${label}. ${generatedAtLabel}`);
@@ -279,21 +253,22 @@ export default function App() {
     }
 
     if (transcript.includes('next view') || transcript.includes('next tab')) {
-      const nextIndex = (navIndexByView.current[viewRef.current] + 1) % NAV_ITEMS.length;
-      setViewFromVoice(NAV_ITEMS[nextIndex].id);
+      const currentIndex = NAV_ITEMS.findIndex((item) => item.path === locationRef.current);
+      const nextIndex = (currentIndex + 1) % NAV_ITEMS.length;
+      setViewFromVoice(NAV_ITEMS[nextIndex].path);
       return;
     }
 
     if (transcript.includes('previous view') || transcript.includes('previous tab') || transcript.includes('go back')) {
-      const currentIndex = navIndexByView.current[viewRef.current];
+      const currentIndex = NAV_ITEMS.findIndex((item) => item.path === locationRef.current);
       const nextIndex = (currentIndex - 1 + NAV_ITEMS.length) % NAV_ITEMS.length;
-      setViewFromVoice(NAV_ITEMS[nextIndex].id);
+      setViewFromVoice(NAV_ITEMS[nextIndex].path);
       return;
     }
 
-    const matchedView = NAV_ITEMS.find((item) => VOICE_VIEW_PHRASES[item.id].some((phrase) => transcript.includes(phrase)));
-    if (matchedView) {
-      setViewFromVoice(matchedView.id);
+    const matchedItem = NAV_ITEMS.find((item) => VOICE_VIEW_PHRASES[item.path]?.some((phrase) => transcript.includes(phrase)));
+    if (matchedItem) {
+      setViewFromVoice(matchedItem.path);
       return;
     }
 
@@ -497,15 +472,15 @@ export default function App() {
       if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) return;
       if (activeElement instanceof HTMLElement && activeElement.isContentEditable) return;
 
-      const nextView = VIEW_SHORTCUTS[event.key];
-      if (nextView) {
-        setView(nextView);
+      const nextPath = VIEW_SHORTCUTS[event.key];
+      if (nextPath) {
+        navigate(nextPath);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     voiceEnabledRef.current = voiceEnabled;
@@ -543,30 +518,6 @@ export default function App() {
       }
     }
   }, [voiceEnabled, voiceSupported]);
-
-  const openProject = (slug: string) => {
-    setActiveProjectSlug(slug);
-    setView('project');
-  };
-
-  const renderView = () => {
-    switch (view) {
-      case 'dashboard':
-        return <Dashboard jobs={jobs} agents={agents} />;
-      case 'calendar':
-        return <Calendar jobs={jobs} agents={agents} />;
-      case 'kanban':
-        return <Kanban jobs={jobs} />;
-      case 'jobs':
-        return <Jobs jobs={jobs} modelByAgentId={modelByAgentId} />;
-      case 'insights':
-        return <Insights jobs={jobs} />;
-      case 'taskboard':
-        return <TaskBoard />;
-      case 'project':
-        return activeProjectSlug ? <ProjectBoard slug={activeProjectSlug} /> : <TaskBoard />;
-    }
-  };
 
   return (
     <div className="app-layout">
@@ -619,10 +570,10 @@ export default function App() {
       <nav className="sidebar">
         {NAV_ITEMS.map((item) => (
           <button
-            key={item.id}
+            key={item.path}
             type="button"
-            className={`nav-btn${view === item.id ? ' active' : ''}`}
-            onClick={() => { setView(item.id); setActiveProjectSlug(null); }}
+            className={`nav-btn${location.pathname === item.path ? ' active' : ''}`}
+            onClick={() => { navigate(item.path); setActiveProjectSlug(null); }}
             title={item.label}
           >
             {item.icon}
@@ -636,8 +587,8 @@ export default function App() {
               <button
                 key={p.slug}
                 type="button"
-                className={`sidebar-project-btn${view === 'project' && activeProjectSlug === p.slug ? ' active' : ''}`}
-                onClick={() => openProject(p.slug)}
+                className={`sidebar-project-btn${location.pathname === `/projects/${p.slug}` ? ' active' : ''}`}
+                onClick={() => { setActiveProjectSlug(p.slug); navigate(`/projects/${p.slug}`); }}
                 title={p.name}
               >
                 <span className="sidebar-project-dot" style={{ background: p.color }} />
@@ -656,7 +607,14 @@ export default function App() {
       <main className="content">
         {refreshHint ? <div className="refresh-hint">{refreshHint}</div> : null}
         {error ? <div className="error-bar">{error}. Run ./refresh.sh.</div> : null}
-        {renderView()}
+        <Routes>
+          <Route path="/" element={<Dashboard jobs={jobs} agents={agents} />} />
+          <Route path="/jobs" element={<Jobs jobs={jobs} agents={agents} modelByAgentId={modelByAgentId} />} />
+          <Route path="/tasks" element={<TaskBoard />} />
+          <Route path="/projects/:slug" element={<ProjectBoard slug={activeProjectSlug || ''} />} />
+          <Route path="/insights" element={<Insights jobs={jobs} />} />
+          <Route path="*" element={<Dashboard jobs={jobs} agents={agents} />} />
+        </Routes>
       </main>
     </div>
   );
