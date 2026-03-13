@@ -372,8 +372,11 @@ function CreateTaskForm({
                       else setSelectedDeps(selectedDeps.filter(d => d !== t.id));
                     }}
                   />
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--text-dim)' }}>{t.id}</span>
-                  {t.title}
+                  <span className="task-dep-item-id">{t.id}</span>
+                  <span className="task-dep-item-title">{t.title}</span>
+                  <span className={`task-dep-item-status ${t.status === 'done' ? 'done' : 'unmet'}`}>
+                    {t.status.replace(/_/g, ' ')}
+                  </span>
                 </label>
               ))}
             </div>
@@ -825,8 +828,11 @@ function TaskDetailPanel({
                         else setDepsDraft(depsDraft.filter(d => d !== t.id));
                       }}
                     />
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--text-dim)' }}>{t.id}</span>
-                    {t.title}
+                    <span className="task-dep-item-id">{t.id}</span>
+                    <span className="task-dep-item-title">{t.title}</span>
+                    <span className={`task-dep-item-status ${t.status === 'done' ? 'done' : 'unmet'}`}>
+                      {t.status.replace(/_/g, ' ')}
+                    </span>
                   </label>
                 ))}
               </div>
