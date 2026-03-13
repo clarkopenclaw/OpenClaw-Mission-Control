@@ -712,6 +712,13 @@ button:hover,
   accent-color: var(--accent);
 }
 
+.delivery-channel {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 2px;
+}
+
 /* ── Table ── */
 
 .table {
@@ -815,6 +822,15 @@ button:hover,
 
 .status.idle .status-dot {
   background: var(--idle);
+}
+
+.status.warn {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.status.warn .status-dot {
+  background: var(--accent);
 }
 
 .status.neutral {

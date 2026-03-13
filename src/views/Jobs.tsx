@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import {
-  CronJob, CronView,
+  CronJob, CronView, DeliveryFilter,
   AGENDA_LOOKAHEAD_DAYS, MAX_AGENDA_ITEMS_TOTAL, LOCAL_TIME_ZONE,
   formatSchedule, formatDateFromMs, statusClass,
   buildAgendaItems, groupAgendaByDay, formatTime,
+  classifyDeliveryHealth, deliveryHealthLabel, deliveryHealthClass,
+  isDeliveryIssue, deliveryTooltip,
 } from '../types';
 
 type Props = {
@@ -11,21 +13,44 @@ type Props = {
   modelByAgentId: Record<string, string>;
 };
 
+const DELIVERY_FILTERS: { id: DeliveryFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'issues', label: 'Issues' },
+  { id: 'healthy', label: 'Healthy' },
+];
+
 export default function Jobs({ jobs, modelByAgentId }: Props) {
   const [query, setQuery] = useState('');
   const [enabledOnly, setEnabledOnly] = useState(false);
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>('all');
   const [cronView, setCronView] = useState<CronView>('table');
 
   const filteredJobs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return jobs.filter((job) => {
+    const filtered = jobs.filter((job) => {
       const name = String(job.name || '').toLowerCase();
       const agentId = String(job.agentId || '').toLowerCase();
       const passesQuery = !q || name.includes(q) || agentId.includes(q);
       const passesEnabled = !enabledOnly || Boolean(job.enabled);
-      return passesQuery && passesEnabled;
+      if (!passesQuery || !passesEnabled) return false;
+
+      if (deliveryFilter === 'all') return true;
+      const health = classifyDeliveryHealth(job);
+      if (deliveryFilter === 'issues') return isDeliveryIssue(health);
+      return health === 'healthy' || health === 'best-effort-ok';
     });
-  }, [enabledOnly, jobs, query]);
+
+    // Sort issues to top when filtering for issues
+    if (deliveryFilter === 'issues') {
+      filtered.sort((a, b) => {
+        const aErr = a.state?.consecutiveErrors || 0;
+        const bErr = b.state?.consecutiveErrors || 0;
+        return bErr - aErr;
+      });
+    }
+
+    return filtered;
+  }, [deliveryFilter, enabledOnly, jobs, query]);
 
   const agenda = useMemo(() => {
     const nowMs = Date.now();
@@ -47,6 +72,10 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
   }, [filteredJobs]);
 
   const enabledCount = jobs.filter((j) => j.enabled).length;
+  const issueCount = useMemo(
+    () => jobs.filter((j) => isDeliveryIssue(classifyDeliveryHealth(j))).length,
+    [jobs],
+  );
 
   return (
     <section className="section">
@@ -86,6 +115,18 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
           <input type="checkbox" checked={enabledOnly} onChange={(e) => setEnabledOnly(e.target.checked)} />
           Active only
         </label>
+        <div className="segmented" role="group" aria-label="Delivery filter">
+          {DELIVERY_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={deliveryFilter === f.id ? 'seg active' : 'seg'}
+              onClick={() => setDeliveryFilter(f.id)}
+            >
+              {f.label}{f.id === 'issues' && issueCount > 0 ? ` (${issueCount})` : ''}
+            </button>
+          ))}
+        </div>
       </div>
 
       {cronView === 'table' ? (
@@ -95,26 +136,30 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
               <tr>
                 <th>Name</th>
                 <th>Agent</th>
-                <th>Model</th>
                 <th>Schedule</th>
                 <th style={{ textAlign: 'center' }}>Status</th>
-                <th>Next Run</th>
                 <th>Last Run</th>
                 <th style={{ textAlign: 'center' }}>Last Status</th>
+                <th style={{ textAlign: 'center' }}>Delivery</th>
               </tr>
             </thead>
             <tbody>
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="empty-state">
-                    No tasks match your filter.
+                  <td colSpan={7} className="empty-state">
+                    {deliveryFilter === 'issues'
+                      ? 'No delivery issues found.'
+                      : 'No tasks match your filter.'}
                   </td>
                 </tr>
               ) : (
                 filteredJobs.map((job, index) => {
                   const agentId = job.agentId || '(default)';
-                  const model = modelByAgentId[agentId] || modelByAgentId['(default)'] || '--';
                   const status = job.state?.lastRunStatus || job.state?.lastStatus || '--';
+                  const health = classifyDeliveryHealth(job);
+                  const healthLabel = deliveryHealthLabel(health);
+                  const healthClass = deliveryHealthClass(health);
+                  const tooltip = deliveryTooltip(job);
 
                   return (
                     <tr key={job.id || `${job.name || 'job'}-${index}`}>
@@ -123,7 +168,6 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
                         <div className="job-id">{job.id || '--'}</div>
                       </td>
                       <td className="mono">{agentId}</td>
-                      <td className="mono">{model}</td>
                       <td className="mono">{formatSchedule(job.schedule)}</td>
                       <td style={{ textAlign: 'center' }}>
                         <span
@@ -134,13 +178,23 @@ export default function Jobs({ jobs, modelByAgentId }: Props) {
                           <span className={job.enabled ? 'enabled-dot on' : 'enabled-dot off'} />
                         </span>
                       </td>
-                      <td className="mono">{formatDateFromMs(job.state?.nextRunAtMs)}</td>
                       <td className="mono">{formatDateFromMs(job.state?.lastRunAtMs)}</td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={statusClass(status)}>
                           <span className="status-dot" />
                           {status}
                         </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }} title={tooltip}>
+                        <span className={healthClass}>
+                          <span className="status-dot" />
+                          {healthLabel}
+                        </span>
+                        {job.delivery?.channel ? (
+                          <div className="delivery-channel">
+                            {job.delivery.channel}{job.delivery.to ? ` → ${job.delivery.to}` : ''}
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   );

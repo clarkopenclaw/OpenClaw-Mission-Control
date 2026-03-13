@@ -16,11 +16,21 @@ export type CronJob = {
     tz?: string;
     timezone?: string;
   };
+  delivery?: {
+    mode?: string;
+    channel?: string;
+    to?: string;
+    bestEffort?: boolean;
+  };
   state?: {
     nextRunAtMs?: number;
     lastRunAtMs?: number;
     lastRunStatus?: string;
     lastStatus?: string;
+    lastDurationMs?: number;
+    lastDelivered?: boolean;
+    lastDeliveryStatus?: string;
+    consecutiveErrors?: number;
   };
 };
 
@@ -315,6 +325,80 @@ export function formatTime(epochMs: number, timeZone?: string): string {
       timeZoneName: 'short',
     });
   }
+}
+
+// ── Delivery Health ──
+
+export type DeliveryHealth =
+  | 'healthy'
+  | 'delivery-failed'
+  | 'run-failed'
+  | 'best-effort-ok'
+  | 'missing-target'
+  | 'unknown'
+  | 'disabled';
+
+export type DeliveryFilter = 'all' | 'issues' | 'healthy';
+
+export function classifyDeliveryHealth(job: CronJob): DeliveryHealth {
+  if (!job.enabled) return 'disabled';
+
+  const runStatus = job.state?.lastRunStatus || job.state?.lastStatus || '';
+  const isRunOk = runStatus === 'ok';
+  const isRunError = runStatus === 'error' || runStatus === 'err';
+
+  if (isRunError) return 'run-failed';
+
+  if (!job.delivery?.to) return 'missing-target';
+
+  const deliveryStatus = job.state?.lastDeliveryStatus || '';
+  const delivered = job.state?.lastDelivered;
+
+  if (isRunOk && (deliveryStatus === 'delivered' || delivered === true)) {
+    return job.delivery?.bestEffort ? 'best-effort-ok' : 'healthy';
+  }
+
+  if (isRunOk && (deliveryStatus === 'not-delivered' || delivered === false)) {
+    return 'delivery-failed';
+  }
+
+  return 'unknown';
+}
+
+export function deliveryHealthLabel(health: DeliveryHealth): string {
+  switch (health) {
+    case 'healthy': return 'delivered';
+    case 'delivery-failed': return 'not delivered';
+    case 'run-failed': return 'run failed';
+    case 'best-effort-ok': return 'best-effort';
+    case 'missing-target': return 'no target';
+    case 'disabled': return 'disabled';
+    case 'unknown': return 'unknown';
+  }
+}
+
+export function deliveryHealthClass(health: DeliveryHealth): string {
+  switch (health) {
+    case 'healthy': return 'status ok';
+    case 'delivery-failed': return 'status err';
+    case 'run-failed': return 'status err';
+    case 'best-effort-ok': return 'status warn';
+    case 'missing-target': return 'status err';
+    case 'disabled': return 'status neutral';
+    case 'unknown': return 'status idle';
+  }
+}
+
+export function isDeliveryIssue(health: DeliveryHealth): boolean {
+  return health === 'delivery-failed' || health === 'run-failed' || health === 'missing-target';
+}
+
+export function deliveryTooltip(job: CronJob): string {
+  const channel = job.delivery?.channel || '?';
+  const to = job.delivery?.to || '(none)';
+  const status = job.state?.lastDeliveryStatus || 'unknown';
+  const bestEffort = job.delivery?.bestEffort ? ' [best-effort]' : '';
+  return `${channel} → ${to}\nStatus: ${status}${bestEffort}`;
 }
 
 // ── Task Board Types ──
