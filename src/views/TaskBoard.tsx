@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Task, TaskStatus, TaskType, TaskPriority, TaskEvents, Project, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
 
 const API_BASE = '/api';
@@ -359,28 +359,12 @@ function CreateTaskForm({
           />
         </label>
         {nonDoneTasks.length > 0 && (
-          <div>
-            <label style={{ marginBottom: 4 }}>Dependencies (optional)</label>
-            <div className="task-dep-checklist">
-              {nonDoneTasks.map((t) => (
-                <label key={t.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedDeps.includes(t.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedDeps([...selectedDeps, t.id]);
-                      else setSelectedDeps(selectedDeps.filter(d => d !== t.id));
-                    }}
-                  />
-                  <span className="task-dep-item-id">{t.id}</span>
-                  <span className="task-dep-item-title">{t.title}</span>
-                  <span className={`task-dep-item-status ${t.status === 'done' ? 'done' : 'unmet'}`}>
-                    {t.status.replace(/_/g, ' ')}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <DependencyPicker
+            label="Dependencies (optional)"
+            tasks={nonDoneTasks}
+            selected={selectedDeps}
+            onChange={setSelectedDeps}
+          />
         )}
         <div className="create-task-actions">
           <button type="button" className="task-btn" onClick={onCancel}>Cancel</button>
@@ -398,6 +382,82 @@ function CreateTaskForm({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DependencyPicker({
+  label,
+  tasks,
+  selected,
+  onChange,
+}: {
+  label?: string;
+  tasks: Task[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const toggle = (id: string) => {
+    onChange(selected.includes(id) ? selected.filter(d => d !== id) : [...selected, id]);
+  };
+
+  return (
+    <div className="dep-picker" ref={ref}>
+      {label && <label className="dep-picker-label">{label}</label>}
+      <button type="button" className="dep-picker-trigger" onClick={() => setOpen(!open)}>
+        {selected.length === 0
+          ? 'Select dependencies...'
+          : `${selected.length} task${selected.length > 1 ? 's' : ''} selected`}
+        <span className="dep-picker-arrow">{open ? '\u25b4' : '\u25be'}</span>
+      </button>
+      {selected.length > 0 && (
+        <div className="dep-picker-tags">
+          {selected.map((id) => {
+            const t = tasks.find(x => x.id === id);
+            return (
+              <span key={id} className="dep-picker-tag">
+                {t ? t.title : id}
+                <button type="button" className="dep-picker-tag-remove" onClick={() => toggle(id)}>&times;</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {open && (
+        <div className="dep-picker-dropdown">
+          {tasks.length === 0 && (
+            <div className="dep-picker-empty">No available tasks</div>
+          )}
+          {tasks.map((t) => (
+            <div
+              key={t.id}
+              className={`dep-picker-option${selected.includes(t.id) ? ' selected' : ''}`}
+              onClick={() => toggle(t.id)}
+            >
+              <span className={`dep-picker-check${selected.includes(t.id) ? ' on' : ''}`}>
+                {selected.includes(t.id) ? '\u2713' : ''}
+              </span>
+              <span className="task-dep-item-id">{t.id}</span>
+              <span className="dep-picker-option-title">{t.title}</span>
+              <span className={`task-dep-item-status ${t.status === 'done' ? 'done' : 'unmet'}`}>
+                {t.status.replace(/_/g, ' ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -817,25 +877,11 @@ function TaskDetailPanel({
           </div>
           {editingDeps ? (
             <div>
-              <div className="task-dep-checklist">
-                {tasks.filter(t => t.id !== task.id && t.status !== 'done').map((t) => (
-                  <label key={t.id}>
-                    <input
-                      type="checkbox"
-                      checked={depsDraft.includes(t.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) setDepsDraft([...depsDraft, t.id]);
-                        else setDepsDraft(depsDraft.filter(d => d !== t.id));
-                      }}
-                    />
-                    <span className="task-dep-item-id">{t.id}</span>
-                    <span className="task-dep-item-title">{t.title}</span>
-                    <span className={`task-dep-item-status ${t.status === 'done' ? 'done' : 'unmet'}`}>
-                      {t.status.replace(/_/g, ' ')}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <DependencyPicker
+                tasks={tasks.filter(t => t.id !== task.id && t.status !== 'done')}
+                selected={depsDraft}
+                onChange={setDepsDraft}
+              />
               <div className="task-detail-body-actions">
                 <button type="button" className="task-btn task-btn-approve"
                   onClick={() => { onUpdate(task.id, { depends_on: depsDraft }); setEditingDeps(false); }}>
