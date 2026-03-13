@@ -316,3 +316,61 @@ export function formatTime(epochMs: number, timeZone?: string): string {
     });
   }
 }
+
+// ── Task Board Types ──
+
+export type TaskType = 'coding' | 'research' | 'outbound' | 'ops' | 'manual';
+export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'human_review' | 'merging' | 'blocked' | 'done';
+export type TaskPriority = 'P0' | 'P1' | 'P2' | 'P3';
+export type ReviewType = 'pr' | 'report' | 'decision' | 'approval';
+
+export type Task = {
+  id: string;
+  title: string;
+  type: TaskType;
+  status: TaskStatus;
+  priority: TaskPriority;
+  auto_execute: boolean;
+  agent_chain: string[];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  repo?: string;
+  branch?: string;
+  base_branch?: string;
+  pr_url?: string;
+  run_id?: string;
+  blocked_reason?: string;
+  review_type?: ReviewType;
+  deliverable?: string;
+  agent_active?: string;
+  agent_started_at?: string;
+  attempt: number;
+  max_attempts: number;
+  unblock_attempted?: boolean;
+  merge_retry?: boolean;
+  body?: string;
+};
+
+export const TASK_COLUMNS: { id: TaskStatus; label: string; colorVar: string }[] = [
+  { id: 'backlog', label: 'Backlog', colorVar: 'var(--text-dim)' },
+  { id: 'todo', label: 'To Do', colorVar: 'var(--accent)' },
+  { id: 'in_progress', label: 'In Progress', colorVar: 'var(--ok)' },
+  { id: 'human_review', label: 'Human Review', colorVar: '#a78bfa' },
+  { id: 'merging', label: 'Merging', colorVar: '#38bdf8' },
+  { id: 'blocked', label: 'Blocked', colorVar: 'var(--err)' },
+  { id: 'done', label: 'Done', colorVar: 'var(--text-dim)' },
+];
+
+export function priorityColor(p: TaskPriority): string {
+  switch (p) {
+    case 'P0': return 'var(--err)';
+    case 'P1': return 'var(--accent)';
+    case 'P2': return 'var(--text-secondary)';
+    case 'P3': return 'var(--text-dim)';
+  }
+}
+
+export function taskTypeLabel(t: TaskType): string {
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}

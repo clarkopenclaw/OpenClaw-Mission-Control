@@ -985,6 +985,98 @@ code {
 .insights-list-item { font-size: 13px; color: var(--text-secondary); padding: 6px 0; border-bottom: 1px solid var(--border); }
 .insights-timestamp { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
 
+/* ── Task Board ── */
+
+.task-board {
+  display: grid;
+  gap: 12px;
+}
+
+.task-board-columns {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.task-priority-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.task-card-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.task-card-progress {
+  margin-top: 2px;
+}
+
+.task-card-blocked {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.task-card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.task-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: 'Outfit', system-ui, sans-serif;
+  transition: all 0.15s ease;
+}
+
+.task-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.task-btn-approve {
+  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--ok);
+}
+
+.task-btn-approve:hover {
+  background: var(--ok-dim);
+  border-color: rgba(52, 211, 153, 0.5);
+  color: var(--ok);
+}
+
+.task-btn-reject {
+  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--err);
+}
+
+.task-btn-reject:hover {
+  background: var(--err-dim);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--err);
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 960px) {
@@ -1059,6 +1151,10 @@ code {
   }
 
   .kanban {
+    grid-template-columns: 1fr;
+  }
+
+  .task-board-columns {
     grid-template-columns: 1fr;
   }
 

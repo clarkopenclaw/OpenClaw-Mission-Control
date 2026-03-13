@@ -8,8 +8,9 @@ import Calendar from './views/Calendar';
 import Kanban from './views/Kanban';
 import Jobs from './views/Jobs';
 import Insights from './views/Insights';
+import TaskBoard from './views/TaskBoard';
 
-type View = 'dashboard' | 'calendar' | 'kanban' | 'jobs' | 'insights';
+type View = 'dashboard' | 'calendar' | 'kanban' | 'jobs' | 'insights' | 'taskboard';
 
 const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
   {
@@ -69,6 +70,16 @@ const NAV_ITEMS: { id: View; label: string; icon: JSX.Element }[] = [
         <path d="M9 18h6" />
         <path d="M10 22h4" />
         <path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'taskboard',
+    label: 'Task Board',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
       </svg>
     ),
   },
@@ -152,6 +163,8 @@ export default function App() {
         return <Jobs jobs={jobs} modelByAgentId={modelByAgentId} />;
       case 'insights':
         return <Insights jobs={jobs} />;
+      case 'taskboard':
+        return <TaskBoard />;
     }
   };
 
