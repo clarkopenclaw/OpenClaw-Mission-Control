@@ -1,16 +1,20 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Task, TaskStatus, TaskType, TaskPriority, TaskEvents, Project, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
 
-const API_BASE = '/api';
+export const API_BASE = '/api';
 const POLL_INTERVAL = 5000;
 
-export default function TaskBoard() {
+export default function TaskBoard({ projectSlug }: { projectSlug?: string } = {}) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
+
+  const activeProject = projectSlug
+    ? projects.find((p) => p.slug === projectSlug) ?? null
+    : null;
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -39,14 +43,15 @@ export default function TaskBoard() {
   }, [fetchTasks, fetchProjects]);
 
   const columns = useMemo(() => {
-    const filtered = projectFilter
-      ? tasks.filter((t) => t.project === projectFilter)
+    const effectiveFilter = projectSlug ?? projectFilter;
+    const filtered = effectiveFilter
+      ? tasks.filter((t) => t.project === effectiveFilter)
       : tasks;
     return TASK_COLUMNS.map((col) => ({
       ...col,
       tasks: filtered.filter((t) => t.status === col.id),
     }));
-  }, [tasks, projectFilter]);
+  }, [tasks, projectSlug, projectFilter]);
 
   const handleAction = async (taskId: string, action: string) => {
     try {
@@ -116,12 +121,21 @@ export default function TaskBoard() {
 
   return (
     <div className="task-board">
+      {activeProject && (
+        <div className="project-board-header">
+          <span className="project-board-dot" style={{ background: activeProject.color }} />
+          <h2 className="project-board-name">{activeProject.name}</h2>
+          {activeProject.repo && (
+            <span className="project-board-repo mono small">{activeProject.repo}</span>
+          )}
+        </div>
+      )}
       <div className="task-board-toolbar">
         <button type="button" className="task-btn task-btn-create" onClick={() => setShowCreate(true)}>
           + New Task
         </button>
       </div>
-      {projects.length > 0 && (
+      {!projectSlug && projects.length > 0 && (
         <div className="project-filter-bar">
           <button
             type="button"
@@ -150,6 +164,7 @@ export default function TaskBoard() {
           existingTasks={tasks}
           projects={projects}
           onProjectCreated={fetchProjects}
+          defaultProject={projectSlug}
         />
       )}
       {error && <div className="error-bar">{error}</div>}
@@ -202,6 +217,7 @@ function CreateTaskForm({
   existingTasks,
   projects,
   onProjectCreated,
+  defaultProject,
 }: {
   onSubmit: (data: {
     title: string;
@@ -217,15 +233,17 @@ function CreateTaskForm({
   existingTasks: Task[];
   projects: Project[];
   onProjectCreated: () => void;
+  defaultProject?: string;
 }) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<TaskType>('coding');
   const [priority, setPriority] = useState<TaskPriority>('P1');
   const [body, setBody] = useState('');
-  const [repo, setRepo] = useState('~/Documents/mission-control');
+  const defaultProj = defaultProject ? projects.find((p) => p.slug === defaultProject) : undefined;
+  const [repo, setRepo] = useState(defaultProj?.repo || '~/Documents/mission-control');
   const [baseBranch, setBaseBranch] = useState('main');
   const [selectedDeps, setSelectedDeps] = useState<string[]>([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(defaultProject || '');
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectSlug, setNewProjectSlug] = useState('');
   const [newProjectName, setNewProjectName] = useState('');

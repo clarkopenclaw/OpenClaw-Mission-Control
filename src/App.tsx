@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  CronJob, Agent,
+  CronJob, Agent, Project,
   isRecord, loadJson, pickAgentModel, extractJobs, extractAgents, formatGeneratedAt,
 } from './types';
 import packageJson from '../package.json';
@@ -10,8 +10,10 @@ import Kanban from './views/Kanban';
 import Jobs from './views/Jobs';
 import Insights from './views/Insights';
 import TaskBoard from './views/TaskBoard';
+import { API_BASE } from './views/TaskBoard';
+import ProjectBoard from './views/ProjectBoard';
 
-type View = 'dashboard' | 'calendar' | 'kanban' | 'jobs' | 'insights' | 'taskboard';
+type View = 'dashboard' | 'calendar' | 'kanban' | 'jobs' | 'insights' | 'taskboard' | 'project';
 
 type SpeechRecognitionErrorCode =
   | 'aborted'
@@ -79,6 +81,7 @@ const VOICE_VIEW_PHRASES: Record<View, string[]> = {
   jobs: ['jobs', 'job list'],
   insights: ['insights', 'analytics'],
   taskboard: ['task board', 'tasks', 'taskboard'],
+  project: [],
 };
 
 function normalizeVoiceText(text: string) {
@@ -183,6 +186,8 @@ export default function App() {
   const [generatedAt, setGeneratedAt] = useState<string>('Loading...');
   const [error, setError] = useState<string>('');
   const [refreshHint, setRefreshHint] = useState<string>('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectSlug, setActiveProjectSlug] = useState<string | null>(null);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
@@ -297,6 +302,17 @@ export default function App() {
   };
 
   runVoiceCommandRef.current = runVoiceCommand;
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/projects`);
+      if (res.ok) setProjects(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
 
   useEffect(() => {
     void (async () => {
@@ -528,6 +544,11 @@ export default function App() {
     }
   }, [voiceEnabled, voiceSupported]);
 
+  const openProject = (slug: string) => {
+    setActiveProjectSlug(slug);
+    setView('project');
+  };
+
   const renderView = () => {
     switch (view) {
       case 'dashboard':
@@ -542,6 +563,8 @@ export default function App() {
         return <Insights jobs={jobs} />;
       case 'taskboard':
         return <TaskBoard />;
+      case 'project':
+        return activeProjectSlug ? <ProjectBoard slug={activeProjectSlug} /> : <TaskBoard />;
     }
   };
 
@@ -599,12 +622,30 @@ export default function App() {
             key={item.id}
             type="button"
             className={`nav-btn${view === item.id ? ' active' : ''}`}
-            onClick={() => setView(item.id)}
+            onClick={() => { setView(item.id); setActiveProjectSlug(null); }}
             title={item.label}
           >
             {item.icon}
+            <span className="nav-btn-label">{item.label}</span>
           </button>
         ))}
+        {projects.length > 0 && (
+          <div className="sidebar-projects">
+            <div className="sidebar-projects-label">Projects</div>
+            {projects.map((p) => (
+              <button
+                key={p.slug}
+                type="button"
+                className={`sidebar-project-btn${view === 'project' && activeProjectSlug === p.slug ? ' active' : ''}`}
+                onClick={() => openProject(p.slug)}
+                title={p.name}
+              >
+                <span className="sidebar-project-dot" style={{ background: p.color }} />
+                <span className="sidebar-project-name">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="sidebar-spacer" />
         <div className="sync-pill sidebar-sync">
           <span className="sync-dot" />
