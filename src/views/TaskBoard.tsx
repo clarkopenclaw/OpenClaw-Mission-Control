@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Markdown from 'react-markdown';
-import { Task, TaskStatus, TaskType, TaskPriority, TaskEvents, TaskArtifact, Project, TASK_COLUMNS, priorityColor, taskTypeLabel } from '../types';
+import { Task, TaskStatus, TaskType, TaskPriority, TaskEvents, TaskArtifact, Project, TASK_COLUMNS, PHASE_ORDER, priorityColor, taskTypeLabel } from '../types';
 
 export const API_BASE = '/api';
 const POLL_INTERVAL = 5000;
@@ -691,49 +691,197 @@ function TaskCard({
   );
 }
 
-function ArtifactSection({ artifacts }: { artifacts: TaskArtifact[] }) {
-  const sorted = useMemo(
-    () => [...artifacts].sort((a, b) => b.created_at.localeCompare(a.created_at)),
-    [artifacts],
-  );
-  const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]));
+function MediaArtifactRenderer({ artifact, onImageClick }: { artifact: TaskArtifact; onImageClick?: (url: string) => void }) {
+  const artType = artifact.type || 'text';
 
-  const toggle = (idx: number) => {
+  if (artType === 'image' && artifact.url) {
+    return (
+      <div className="artifact-media artifact-image">
+        <img
+          src={artifact.thumbnail_url || artifact.url}
+          alt={artifact.title}
+          onClick={() => onImageClick?.(artifact.url!)}
+          style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 4 }}
+        />
+        {artifact.content && (
+          <p className="artifact-caption">{artifact.content}</p>
+        )}
+        {artifact.slack_ts && (
+          <span className="artifact-slack-badge" title="Posted to Slack">Slack</span>
+        )}
+      </div>
+    );
+  }
+
+  if (artType === 'video' && artifact.url) {
+    return (
+      <div className="artifact-media artifact-video">
+        <video
+          controls
+          poster={artifact.thumbnail_url}
+          style={{ maxWidth: '100%', borderRadius: 4 }}
+        >
+          <source src={artifact.url} type={artifact.mime_type || 'video/mp4'} />
+        </video>
+        {artifact.content && (
+          <p className="artifact-caption">{artifact.content}</p>
+        )}
+        {artifact.slack_ts && (
+          <span className="artifact-slack-badge" title="Posted to Slack">Slack</span>
+        )}
+      </div>
+    );
+  }
+
+  if (artType === 'link' && artifact.url) {
+    return (
+      <div className="artifact-media artifact-link-card">
+        <a href={artifact.url} target="_blank" rel="noreferrer">
+          {artifact.title}
+        </a>
+        {artifact.content && (
+          <p className="artifact-caption">{artifact.content}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Default: text / markdown
+  return (
+    <div className="task-artifact-content">
+      <Markdown>{artifact.content}</Markdown>
+    </div>
+  );
+}
+
+function ArtifactSection({ artifacts, onImageClick }: { artifacts: TaskArtifact[]; onImageClick?: (url: string) => void }) {
+  // Group by phase, then sort within each group by created_at
+  const grouped = useMemo(() => {
+    const byPhase = new Map<string, TaskArtifact[]>();
+    for (const a of artifacts) {
+      const phase = a.phase || 'untagged';
+      const list = byPhase.get(phase) || [];
+      list.push(a);
+      byPhase.set(phase, list);
+    }
+    // Sort phases by PHASE_ORDER
+    const sorted = [...byPhase.entries()].sort(([a], [b]) => {
+      const ai = PHASE_ORDER.indexOf(a as TaskStatus);
+      const bi = PHASE_ORDER.indexOf(b as TaskStatus);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    // Sort artifacts within each phase by created_at desc
+    for (const [, list] of sorted) {
+      list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    return sorted;
+  }, [artifacts]);
+
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['0-0']));
+  const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set());
+
+  const toggleArtifact = (key: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
 
+  const togglePhase = (phase: string) => {
+    setCollapsedPhases((prev) => {
+      const next = new Set(prev);
+      if (next.has(phase)) next.delete(phase);
+      else next.add(phase);
+      return next;
+    });
+  };
+
+  const hasMultiplePhases = grouped.length > 1;
+
   return (
     <>
       <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-dim)' }}>Artifacts</h4>
+      {/* Phase timeline dots */}
+      {hasMultiplePhases && (
+        <div className="artifact-phase-timeline">
+          {grouped.map(([phase]) => {
+            const col = TASK_COLUMNS.find(c => c.id === phase);
+            return (
+              <div key={phase} className="artifact-phase-dot" style={{ '--dot-color': col?.colorVar || 'var(--text-dim)' } as React.CSSProperties}>
+                <span className="artifact-phase-dot-circle" />
+                <span className="artifact-phase-dot-label">{phase.replace(/_/g, ' ')}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div style={{ display: 'grid', gap: 8 }}>
-        {sorted.map((a, i) => (
-          <div key={i}>
-            <button
-              type="button"
-              className="task-artifact-header"
-              style={expanded.has(i) ? { borderRadius: '6px 6px 0 0' } : undefined}
-              onClick={() => toggle(i)}
-            >
-              <span>
-                {expanded.has(i) ? '\u25be' : '\u25b8'}{' '}
-                {a.title}
-              </span>
-              <span className="small mono" style={{ color: 'var(--text-dim)' }}>
-                {a.kind} &middot; {new Date(a.created_at).toLocaleString()}
-              </span>
-            </button>
-            {expanded.has(i) && (
-              <div className="task-artifact-content">{a.content}</div>
+        {grouped.map(([phase, list], gi) => (
+          <div key={phase}>
+            {hasMultiplePhases && (
+              <button
+                type="button"
+                className="artifact-phase-header"
+                onClick={() => togglePhase(phase)}
+              >
+                <span>
+                  {collapsedPhases.has(phase) ? '\u25b8' : '\u25be'}{' '}
+                  {phase.replace(/_/g, ' ')}
+                </span>
+                <span className="small mono" style={{ color: 'var(--text-dim)' }}>
+                  {list.length} artifact{list.length !== 1 ? 's' : ''}
+                </span>
+              </button>
             )}
+            {!collapsedPhases.has(phase) && list.map((a, i) => {
+              const key = `${gi}-${i}`;
+              const artType = a.type || 'text';
+              const isMedia = artType === 'image' || artType === 'video';
+              return (
+                <div key={key} style={{ marginBottom: 4 }}>
+                  <button
+                    type="button"
+                    className="task-artifact-header"
+                    style={expanded.has(key) ? { borderRadius: '6px 6px 0 0' } : undefined}
+                    onClick={() => toggleArtifact(key)}
+                  >
+                    <span>
+                      {expanded.has(key) ? '\u25be' : '\u25b8'}{' '}
+                      {isMedia && <span className="artifact-type-icon">{artType === 'image' ? '\ud83d\uddbc' : '\ud83c\udfac'}</span>}
+                      {a.title}
+                    </span>
+                    <span className="small mono" style={{ color: 'var(--text-dim)' }}>
+                      {a.kind}{a.source ? ` \u00b7 ${a.source}` : ''} &middot; {new Date(a.created_at).toLocaleString()}
+                    </span>
+                  </button>
+                  {expanded.has(key) && (
+                    <MediaArtifactRenderer artifact={a} onImageClick={onImageClick} />
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
     </>
+  );
+}
+
+function SlackThreadLink({ task }: { task: Task }) {
+  if (!task.slack_thread_url) return null;
+  return (
+    <div className="slack-thread-link">
+      <a href={task.slack_thread_url} target="_blank" rel="noreferrer">
+        Slack Thread
+      </a>
+      {task.last_notified_phase && (
+        <span className="slack-last-phase-badge">
+          {task.last_notified_phase.replace(/_/g, ' ')}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -759,6 +907,7 @@ function TaskDetailPanel({
   const [bodyDraft, setBodyDraft] = useState(task.body || '');
   const [editingDeps, setEditingDeps] = useState(false);
   const [depsDraft, setDepsDraft] = useState<string[]>(task.depends_on || []);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Reset drafts when task changes
   useEffect(() => {
@@ -957,10 +1106,20 @@ function TaskDetailPanel({
           )}
         </div>
 
+        {/* Slack thread link */}
+        <SlackThreadLink task={task} />
+
         {/* Artifacts section */}
         {events?.artifacts && events.artifacts.length > 0 && (
           <div className="task-detail-section">
-            <ArtifactSection artifacts={events.artifacts} />
+            <ArtifactSection artifacts={events.artifacts} onImageClick={setLightboxUrl} />
+          </div>
+        )}
+
+        {/* Image lightbox */}
+        {lightboxUrl && (
+          <div className="artifact-lightbox" onClick={() => setLightboxUrl(null)}>
+            <img src={lightboxUrl} alt="Full size" />
           </div>
         )}
 
