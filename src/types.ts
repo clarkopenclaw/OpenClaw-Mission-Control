@@ -333,10 +333,20 @@ export type TaskEvents = {
   artifacts?: TaskArtifact[];
 };
 
+export type ArtifactType = 'text' | 'image' | 'video' | 'link';
+
 export type TaskArtifact = {
-  kind: 'plan' | 'report' | 'deliverable';
+  kind: 'plan' | 'report' | 'deliverable' | 'screenshot' | 'video_clip' | 'reference';
+  type?: ArtifactType;
   title: string;
   content: string;
+  url?: string;
+  mime_type?: string;
+  thumbnail_url?: string;
+  phase?: TaskStatus;
+  source?: string;
+  slack_file_id?: string;
+  slack_ts?: string;
   created_at: string;
 };
 
@@ -387,7 +397,15 @@ export type Task = {
     transcript_path?: string;
   };
   supervisor_rounds?: number;
+  slack_channel?: string;
+  slack_thread_ts?: string;
+  last_notified_phase?: TaskStatus;
+  slack_thread_url?: string;
 };
+
+export const PHASE_ORDER: TaskStatus[] = [
+  'backlog', 'todo', 'in_progress', 'supervising', 'human_review', 'merging', 'blocked', 'done',
+];
 
 export type Project = {
   slug: string;
